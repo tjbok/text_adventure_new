@@ -1,0 +1,25 @@
+{
+  "SWORD": {
+    "name": "longsword",
+    "long_desc": "longsword of elvish origin",
+    "examine_string": "This is an ancient sword, probably crafted for a king or an important general. Elven runes cover the hilt, which also contains three large sapphires that shimmer with some magical light.",
+    "words": ["SWORD", "LONGSWORD"],
+    "takeable?": true,
+    "init_loc": "DUNGEON"
+  },
+  "ROCK": {
+    "name": "rock",
+    "words": ["ROCK"],
+    "takeable?": true,
+    "init_loc": "CASTLE_GATE"
+  },
+  "TORCH": {
+    "name": "torch",
+    "long_desc": "flickering torch",
+    "words": ["TORCH"],
+    "takeable?": true,
+    "light_source?": true,
+    "init_loc": "CASTLE_COURTYARD"
+  },
+  "ALL": { "name": "All", "words": "ALL" }
+}
