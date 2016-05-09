@@ -63,7 +63,7 @@ def Actions(context):
         print()
 
 def Quit(context):
-    context.conditions.quit_pending = True
+    context.state.quit_pending = True
     print("Are you sure you want to quit (Y/N)?")
 
 def Yes(context):

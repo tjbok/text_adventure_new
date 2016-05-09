@@ -3,18 +3,19 @@ import json
 import action_handlers
 import globals
 import item_handlers
-
+import location_handlers
 
 ######################### CONTEXT #########################
 
 # This class is a package of all of the major object containers which can easily be passed to action handlers
 class Context:
-    def __init__(self, player, locations, actions, items, conditions):
+    def __init__(self, player, locations, actions, items, state, events):
         self.player = player
         self.locations = locations
         self.actions = actions
         self.items = items
-        self.conditions = conditions
+        self.state = state
+        self.events = events
 
 ######################### PLAYER #########################
 
@@ -67,6 +68,7 @@ class State:
 
         if self.parse_successful:
             if not self.waiting_for_object:
+                events.CheckEvents(self.turn_counter)
                 self.turn_counter += 1
             self.last_action = self.this_action
             self.last_object = self.this_object
@@ -83,9 +85,19 @@ class LocationsMaster:
             self.locations_dictionary[loc_key]["key"] = loc_key
             self.locations_dictionary[loc_key]["touched?"] = False
             self.locations_dictionary[loc_key]["items"] = []
+            self.locations_dictionary[loc_key]["enter_handler"] = None
+            self.locations_dictionary[loc_key]["when_here_handler"] = None
 
     # This allows you to type "locations[<key>]" for convenience
     def __getitem__(self, key): return self.locations_dictionary[key]
+
+    # Add a function to trigger on entering this location
+    def AddEnterHandler(self, loc_key, handler):
+        self.locations_dictionary[loc_key]["enter_handler"] = handler
+
+    # Add a function to run as a handler whenever the player is at this location
+    def AddWhenHereHandler(self, loc_key, handler):
+        self.locations_dictionary[loc_key]["when_here_handler"] = handler
 
     # This function handles a move in a certain direction.
     def HandleMove(self, direction):
@@ -98,7 +110,11 @@ class LocationsMaster:
     # This function moves the player to a new location and prints room location
     def EnterRoom(self, new_location_key):
         new_location = self.locations_dictionary[new_location_key]
-        if new_location["touched?"]:
+        first_time_here = not new_location["touched?"]
+        enter_handler = new_location.get("enter_handler")
+        if (enter_handler != None) and enter_handler(context, first_time_here):
+            return True
+        if not first_time_here:
             player.SetPlayerLocation(new_location_key)
             print(new_location["brief_desc"])
             if not self.IsDark():
@@ -244,6 +260,10 @@ class ActionsMaster:
                 else:
                     print("What do you want to " + str.lower(command_words[0]) + "?")
                     state.waiting_for_object = True
+                return
+            location_handler = player.GetPlayerLocation()["when_here_handler"]
+            if (location_handler != None) and location_handler(context, action, None):
+                return
             elif not action["handler"] == None:
                 action["handler"](context)
             elif action.get("is_move?"):
@@ -266,8 +286,13 @@ class ActionsMaster:
         elif not items.TestIfItemIsHere(item):
             return
         else:
-            # First, test if there is an item handler for this action that handles the command...
-            handler = items.items_dictionary[item["key"]]["handler"]
+            # First, test if there is a location handler for this location...
+            location_handler = player.GetPlayerLocation()["when_here_handler"]
+            if (location_handler != None) and location_handler(context, action, item):
+                return
+
+            # Next, test if there is an item handler for this action that handles the command...
+            handler = item["handler"]
             if (not handler == None) and handler(context, action):
                 return
 
@@ -392,8 +417,36 @@ class ItemsMaster:
 
 class Event:
     # Constructor
-    def __init__(self, trigger_turn, ):
-        pass
+    def __init__(self, trigger_turn, event_func):
+        self.trigger_turn = trigger_turn
+        self.event_func = event_func
+
+class EventsMaster:
+    # Constructor
+    def __init__(self):
+        self.events = []
+
+    # Each turn, we go through the event queue to see if any are supposed to trigger this turn.
+    def CheckEvents(self, turn_counter):
+        new_events = []
+        for event in self.events:
+            if event.trigger_turn == turn_counter:
+                event.event_func(context)
+            elif event.trigger_turn > turn_counter:
+                new_events.append(event)
+        self.events = new_events
+
+    # Add an event to the queue, happening in n moves
+    def CreateEventInNMoves(self, event_func, n):
+        self.events.append(Event(state.turn_counter + n, event_func))
+
+    # This is useful if you want to add a statement to the bottom of whatever will normally be printed.
+    def PrintBelow(self, string):
+        self.CreateEventInNMoves(lambda x: print("\n" + string), 0)
+
+    # This adds a simple event in N moves which prints a string
+    def PrintStringInNMoves(self, string, n):
+        self.CreateEventInNMoves(lambda x: print("\n" + string), n)
 
 ######################### HELPER FUNCTIONS #########################
 
@@ -407,10 +460,12 @@ player = Player()
 locations = LocationsMaster()
 actions = ActionsMaster()
 items = ItemsMaster()
+events = EventsMaster()
 state = State()
-context = Context(player, locations, actions, items, state)
+context = Context(player, locations, actions, items, state, events)
 action_handlers.Register(context)
 item_handlers.Register(context)
+location_handlers.Register(context)
 
 # Here is the MAIN LOOP
 def Play():
