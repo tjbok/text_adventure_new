@@ -12,11 +12,6 @@
 # When you bind, make sure you choose the right Add function, depending on whether
 #  you are adding an enter handler or when-here handler.
 
-# This is a helper function that prints out your string, but replaces
-#  the '@' character with 'the <item name>' for whatever item you pass in.
-def PrintDefaultActionString(default_string, item):
-    print(default_string.replace("@", "the " + item.get("name")))
-
 def EnterLookoutWalkway(context, first_time):
     if first_time:
         context.events.PrintBelow("You hear a faint moan coming from the tower to the south.")

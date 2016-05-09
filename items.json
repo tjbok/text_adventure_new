@@ -21,5 +21,17 @@
     "light_source?": true,
     "init_loc": "CASTLE_COURTYARD"
   },
+  "BEDS": {
+    "name": "beds",
+    "words": ["BED", "BEDS"],
+    "init_loc": "GUARDS_QUARTERS",
+    "do_not_list?": true
+  },
+  "WEAPONS_RACK": {
+    "name": "empty weapons racks",
+    "words": ["WEAPON", "WEAPONS", "RACK", "RACKS"],
+    "init_loc": "GUARDS_QUARTERS",
+    "do_not_list?": true
+  },
   "ALL": { "name": "All", "words": "ALL" }
 }

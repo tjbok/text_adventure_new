@@ -1,9 +1,14 @@
-import json
+# This is the main file for Erik and Tom's text adventure.
+# game.py contains all class definitions and core game logic.
 
+# You probably don't need to modify this file unless you want to change something about the deep logic of the game
+
+import json
 import action_handlers
 import globals
 import item_handlers
 import location_handlers
+import textwrap
 
 ######################### CONTEXT #########################
 
@@ -17,6 +22,13 @@ class Context:
         self.state = state
         self.events = events
 
+    def Print(self, print_string):
+        strings = print_string.split('\n')
+        for string in strings:
+            print(textwrap.fill(string, 75))
+
+    def PrintItemInString(self, default_string, item):
+        self.Print(default_string.replace("@", "the " + item.get("name")))
 ######################### PLAYER #########################
 
 # This class contains player status information
@@ -105,7 +117,7 @@ class LocationsMaster:
         if (new_location_key != None) and (len(new_location_key) > 0):
             self.EnterRoom(new_location_key)
         else:
-            print("You can't go in that direction.")
+            Print("You can't go in that direction.")
 
     # This function moves the player to a new location and prints room location
     def EnterRoom(self, new_location_key):
@@ -116,7 +128,7 @@ class LocationsMaster:
             return True
         if not first_time_here:
             player.SetPlayerLocation(new_location_key)
-            print(new_location["brief_desc"])
+            Print(new_location["brief_desc"])
             if not self.IsDark():
                 self.DescribeItemsInLocation()
         else:
@@ -126,12 +138,12 @@ class LocationsMaster:
     # This function implements a LOOK action
     def DoLook(self):
         location = self.locations_dictionary[player.location]
-        print(location["brief_desc"])
+        Print(location["brief_desc"])
         if self.IsDark():
-            print("It is pitch dark in here.")
+            Print("It is pitch dark in here.")
         else:
             location["touched?"] = True
-            print(location["long_desc"])
+            Print(location["long_desc"])
             self.DescribeItemsInLocation()
 
     # Describes all items in a particular location
@@ -140,12 +152,12 @@ class LocationsMaster:
         first_item = True
         if len(location["items"]) > 0:
             for item_key in location["items"]:
-                if items[item_key].get("do_not_list"):
+                if items[item_key].get("do_not_list?"):
                     continue
                 if first_item:
                     print()
                     first_item = False
-                print("There is a " + items.GetLongDescription(item_key) + " here.")
+                Print("There is a " + items.GetLongDescription(item_key) + " here.")
 
     # Is the current location dark (and is there no light source in the room or in player inventory?)
     def IsDark(self):
@@ -194,21 +206,21 @@ class ActionsMaster:
         state.this_user_words = command_words
 
         if len(command_words) > 2:
-            print("That sentence has too many words.")
+            Print("That sentence has too many words.")
             return
 
         if len(command_string) == 0:
-            print("Eh?")
+            Print("Eh?")
             return
 
         # Handle case where we're waiting to see if the user confirmed a QUIT (by typing Y or N)
         if state.quit_pending and (len(command_words) == 1):
             if (command_string == 'Y') or (command_string == 'YES'):
-                print("Quitting...")
+                Print("Quitting...")
                 state.quit_confirmed = True
                 return
             if (command_string == 'N') or (command_string == 'NO'):
-                print("Okay, Quit cancelled.")
+                Print("Okay, Quit cancelled.")
                 state.quit_pending = False
                 return
 
@@ -229,10 +241,10 @@ class ActionsMaster:
                 return
 
         if word_one_item != None:
-            print("I don't understand that command.")
+            Print("I don't understand that command.")
             return
 
-        print("I don't understand the word \"" + command_words[0] + "\".")
+        Print("I don't understand the word \"" + command_words[0] + "\".")
 
     # Once we know what action the user has typed, we continue parsing (this is the second parsing function called)
     def ParseAction(self, action_key, command_words):
@@ -255,10 +267,10 @@ class ActionsMaster:
             state.parse_successful = True
             if action.get("requires_object?"):
                 if len(command_words[0]) == 1:
-                    print("What do you want to " + str.lower(action["words"][0]) + "?")
+                    Print("What do you want to " + str.lower(action["words"][0]) + "?")
                     state.waiting_for_object = True
                 else:
-                    print("What do you want to " + str.lower(command_words[0]) + "?")
+                    Print("What do you want to " + str.lower(command_words[0]) + "?")
                     state.waiting_for_object = True
                 return
             location_handler = player.GetPlayerLocation()["when_here_handler"]
@@ -277,12 +289,12 @@ class ActionsMaster:
         # Handle two word command (e.g. get sword)
         item = items.MatchStringToItem(command_words[1])
         if item == None:
-            print("I don't understand the word \"" + command_words[1] + "\".")
+            Print("I don't understand the word \"" + command_words[1] + "\".")
             return
         state.last_object = item
         state.parse_successful = True
         if (not action.get("requires_object?")) or ((item["key"] == "ALL") and (not action.get("supports_all?"))):
-            print("I don't understand that command.")
+            Print("I don't understand that command.")
         elif not items.TestIfItemIsHere(item):
             return
         else:
@@ -308,9 +320,9 @@ class ActionsMaster:
     def PrintActionDefault(self, action):
         default_result = action.get("default_result")
         if default_result == None:
-            print("You can't do that.")
+            Print("You can't do that.")
         else:
-            print(default_result)
+            Print(default_result)
 
 ######################### ITEMS #########################
 
@@ -358,7 +370,7 @@ class ItemsMaster:
 
     # Prints a warning that you can't see any such item at the moment
     def YouCantSeeItemHere(self):
-        print("You can't see any " + str.lower(state.this_user_words[1]) + " here!")
+        Print("You can't see any " + str.lower(state.this_user_words[1]) + " here!")
 
     # Obtains a long description for the item (with backups if that field hasn't been specified in the locations file)
     def GetLongDescription(self, item_key):
@@ -384,11 +396,11 @@ class ItemsMaster:
                 taken_items += 1
 
         if taken_items == 0:
-            print("There is nothing here to take!")
+            Print("There is nothing here to take!")
 
     # Does a get on one item
     def GetItem(self, item_key):
-        print("Taken.")
+        Print("Taken.")
         player.GetPlayerLocation()["items"].remove(item_key)
         player.inventory.append(item_key)
 
@@ -400,7 +412,7 @@ class ItemsMaster:
             drop_list.append(item_key)
 
         if len(drop_list) == 0:
-            print("You aren't carrying anything!")
+            Print("You aren't carrying anything!")
             return
 
         for item_key in drop_list:
@@ -409,7 +421,7 @@ class ItemsMaster:
 
     # Does a drop on one item
     def DropItem(self, item_key):
-        print("Dropped.")
+        Print("Dropped.")
         player.GetPlayerLocation()["items"].append(item_key)
         player.inventory.remove(item_key)
 
@@ -442,16 +454,19 @@ class EventsMaster:
 
     # This is useful if you want to add a statement to the bottom of whatever will normally be printed.
     def PrintBelow(self, string):
-        self.CreateEventInNMoves(lambda x: print("\n" + string), 0)
+        self.CreateEventInNMoves(lambda x: Print("\n" + string), 0)
 
     # This adds a simple event in N moves which prints a string
     def PrintStringInNMoves(self, string, n):
-        self.CreateEventInNMoves(lambda x: print("\n" + string), n)
+        self.CreateEventInNMoves(lambda x: Print("\n" + string), n)
 
 ######################### HELPER FUNCTIONS #########################
 
-def PrintDefaultActionString(default_string, item):
-    print(default_string.replace("@", "the " + item.get("name")))
+def Print(string):
+    context.Print(string)
+
+def PrintItemInString(default_string, item):
+    context.PrintItemInString(default_string, item)
 
 ######################### MAIN LOOP #########################
 
@@ -469,7 +484,7 @@ location_handlers.Register(context)
 
 # Here is the MAIN LOOP
 def Play():
-    globals.IntroText()
+    globals.IntroText(context)
     globals.InitialSetup(context)
     locations.DoLook()
     while not state.quit_confirmed:

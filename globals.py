@@ -1,6 +1,6 @@
 # This function is called as the game is starting. Use it to print introduction text.
-def IntroText():
-    print("Welcome adventurer!")
+def IntroText(context):
+    context.Print("Welcome adventurer!")
     print()
 
 # This function is called as the game is starting. Use it to initialize game settings

@@ -3,18 +3,13 @@
 # To add a new action handler, first create a function for your action
 #  and then "bind" the handler to your action in the bottom section of the file.
 
-# This is a helper function that prints out your string, but replaces
-#  the '@' character with 'the <item name>' for whatever item you pass in.
-def PrintDefaultActionString(default_string, item):
-    print(default_string.replace("@", "the " + item.get("name")))
-
 def Get(context, item):
     if item["key"] == "ALL":
         context.items.GetAll()
     elif item["key"] in context.player.inventory:
-        PrintDefaultActionString("You're already carrying @.", item)
+        context.PrintItemInString("You're already carrying @.", item)
     elif (not item.get("takeable?")):
-        print("You can't pick that up!")
+        context.Print("You can't pick that up!")
     else:
         context.items.GetItem(item["key"])
 
@@ -22,30 +17,30 @@ def Drop(context, item):
     if item["key"] == "ALL":
         context.items.DropAll()
     elif not (item["key"] in context.player.inventory):
-        PrintDefaultActionString("You're not carrying @.", item)
+        context.PrintItemInString("You're not carrying @.", item)
     else:
         context.items.DropItem(item["key"])
 
 def Examine(context, item):
     examine_string = item.get("examine_string")
     if (not examine_string == None) and (len(examine_string) > 0):
-        print(examine_string)
+        context.Print(examine_string)
     else:
-        PrintDefaultActionString("You see nothing special about @.", item)
+        context.PrintItemInString("You see nothing special about @.", item)
 
 def Inventory(context):
-    print("You are carrying:")
+    context.Print("You are carrying:")
     if len(context.player.inventory) == 0:
-        print("  Nothing")
+        context.Print("  Nothing")
     else:
         for item_key in context.player.inventory:
-            print("  a " + context.items.GetLongDescription(item_key))
+            context.Print("  a " + context.items.GetLongDescription(item_key))
 
 def Help(context):
-    print("This is a text adventure game.")
-    print("Enter commands like \'GO NORTH\' or \'TAKE ROCK\' to tell the computer what you would like to do.")
-    print("Most commands are either one or two words.")
-    print("For a full list of commands, type \'ACTIONS\'.")
+    context.Print("This is a text adventure game.")
+    context.Print("Enter commands like \'GO NORTH\' or \'TAKE ROCK\' to tell the computer what you would like to do.")
+    context.Print("Most commands are either one or two words.")
+    context.Print("For a full list of commands, type \'ACTIONS\'.")
 
 def Actions(context):
     print("Available actions:")
@@ -53,27 +48,27 @@ def Actions(context):
         if context.actions[action_key].get("suppress_in_actions_list?"):
             continue
 
-        print("  ", end='')
+        print_string = "  "
         i = 0
         for word in context.actions.actions_dictionary[action_key]["words"]:
             if i > 0:
-                print(" / ", end='')
-            print(word, end='')
+                print_string += " / "
+            print_string += word
             i += 1
-        print()
+        context.Print(print_string)
 
 def Quit(context):
     context.state.quit_pending = True
-    print("Are you sure you want to quit (Y/N)?")
+    context.Print("Are you sure you want to quit (Y/N)?")
 
 def Yes(context):
-    print("You sound really positive!")
+    context.Print("You sound really positive!")
 
 def No(context):
-    print("You sound awfully negative!")
+    context.Print("You sound awfully negative!")
 
 def Wait(context):
-    print("Time passes...")
+    context.Print("Time passes...")
 
 # Here is where you "bind" your action handler function to a specific action.
 def Register(context):
