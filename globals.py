@@ -7,3 +7,5 @@ def IntroText(context):
 #  like the player's starting location.
 def InitialSetup(context):
     context.player.SetPlayerLocation("CASTLE_GATE")
+    context.actions.swear_words = {"SHIT", "DAMN"}
+    context.actions.swear_response = "Hey, watch your language!"

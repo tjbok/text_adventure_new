@@ -197,6 +197,13 @@ class ActionsMaster:
     def AddActionHandler(self, action_key, handler):
         self.actions_dictionary[action_key]["handler"] = handler
 
+    # Is this word in the list of swears (defined in the globals)
+    def CheckForSwear(self, word):
+        if word in self.swear_words:
+            Print(self.swear_response)
+            return True
+        return False
+
     # Parse the user's command (this is the first function called)
     def ParseCommand(self, command_string):
         state.this_user_input = command_string
@@ -204,6 +211,10 @@ class ActionsMaster:
             "LOOK AT", "EXAMINE").strip()
         command_words = command_string.split(' ')
         state.this_user_words = command_words
+
+        for word in command_words:
+            if self.CheckForSwear(word):
+                return
 
         if len(command_words) > 2:
             Print("That sentence has too many words.")
