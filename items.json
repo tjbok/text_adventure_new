@@ -4,8 +4,9 @@
     "long_desc": "shiny silver coin",
     "examine_string": "This is a shiny silver coin with a picture of a distinguished woman with a block-shaped face",
     "words": ["COIN"],
+    "adjectives":["SHINY", "SILVER"],
     "takeable?": true,
-    "init_loc": "PLAYER"
+    "init_loc": "RECORDING_STUDIO"
   },
   "TORCH": {
     "name": "torch",
@@ -40,6 +41,22 @@
     "init_loc": "DINER_INTERIOR",
     "do_not_list?": true
   },
+  "KEYPAD" : {
+    "name": "jukebox keypad",
+    "words": ["KEYPAD", "PAD"],
+    "adjectives": ["JUKEBOX", "NUMERIC"],
+    "init_loc": "DINER_INTERIOR",
+    "do_not_list?": true,
+    "awaiting_input?" : false
+  },
+  "PUNCHING_BAG": {
+    "name": "punching bag",
+    "words": ["BAG"],
+    "adjectives": ["PUNCHING"],
+    "init_loc": "BOXING_GYM",
+    "do_not_list?": true
+  },
   "ALL": { "name": "All", "words": ["ALL"] },
+  "NUMBER": { "name": "Number", "words": ["NUMBER"], "user_value": "" },
   "IT": {"name": "It", "words": ["IT"]}
 }

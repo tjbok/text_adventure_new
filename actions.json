@@ -6,7 +6,7 @@
   "NO" : {"words": ["NO"], "suppress_in_actions_list?": true },
   "GET": { "words": ["GET", "TAKE"], "requires_object?": true, "supports_all?": true },
   "DROP": { "words": ["DROP", "LEAVE", "TOSS"], "requires_object?": true, "supports_all?": true },
-  "ATTACK": { "words": ["ATTACK", "FIGHT", "KILL"], "requires_object?": true},
+  "ATTACK": { "words": ["ATTACK", "FIGHT", "KILL", "PUNCH", "HIT", "KICK"], "requires_object?": true},
   "EXAMINE": { "words": ["EXAMINE", "X"], "requires_object?": true },
   "INVENTORY": { "words": ["INVENTORY", "I", "INV"] },
   "LOOK": { "words": ["LOOK", "L"] },
@@ -25,5 +25,7 @@
   "AGAIN": { "words": ["AGAIN", "G"]},
   "WAIT": { "words": ["WAIT", "Z"]},
   "OOPS": {"words": ["OOPS"]},
-  "INSERT": { "words": ["INSERT", "PUT"], "requires_object?": true, "prepositions": ["IN", "INTO"]}
+  "INSERT": { "words": ["INSERT", "PUT"], "requires_object?": true, "prepositions": ["IN", "INTO"]},
+  "TYPE": { "words": ["TYPE"], "requires_number?": true },
+  "TYPE_ON": { "words": ["TYPE"], "requires_number?": true, "prepositions": ["ON", "INTO"]}
 }

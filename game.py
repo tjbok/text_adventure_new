@@ -57,6 +57,7 @@ class State:
         self.quit_confirmed = False
         self.quit_pending = False
         self.waiting_for_object = False
+        self.waiting_for_number= False
         self.waiting_for_second_object = False
         self.waiting_to_disambiguate_object = False
         self.waiting_to_disambiguate_second_object = False
@@ -78,6 +79,7 @@ class State:
     def ClearFlags(self):
         self.quit_pending = False
         self.waiting_for_object = False
+        self.waiting_for_number = False
         self.waiting_for_second_object = False
         self.waiting_to_disambiguate_object = False
         self.waiting_to_disambiguate_second_object = False
@@ -88,7 +90,7 @@ class State:
     # This is called at the end of each turn; it remembers this period's user input and commands for recall next period
     def PostProcess(self):
         if self.parse_successful:
-            if (not self.waiting_for_object) and (not self.waiting_for_second_object) and (not self.waiting_to_disambiguate_object) and (not self.waiting_to_disambiguate_second_object):
+            if (not self.waiting_for_object) and (not self.waiting_for_second_object) and (not self.waiting_to_disambiguate_object) and (not self.waiting_to_disambiguate_second_object) and (not self.waiting_for_number):
                 events.CheckEvents(self.turn_counter)
                 self.turn_counter += 1
             self.last_action = self.this_action
@@ -128,7 +130,11 @@ class LocationsMaster:
     # This function handles a move in a certain direction.
     def HandleMove(self, direction):
         new_location_key = self.locations_dictionary[player.location].get(str.lower(direction))
-        if (new_location_key != None) and (len(new_location_key) > 0):
+        
+        # Test whether the location key in this location is a string description; if so, print it.
+        if ' ' in new_location_key:
+          Print(new_location_key)
+        elif (new_location_key != None) and (len(new_location_key) > 0):
             self.EnterRoom(new_location_key)
         else:
             Print("You can't go in that direction.")
@@ -234,7 +240,7 @@ class ActionsMaster:
     def CheckForUnknownWords(self, command_words):
         for x in range(len(command_words)):
             word = command_words[x]
-            if (not word in self.all_actions) and (not word in self.all_prepositions) and (not word in items.all_nouns) and (not word in items.all_adjectives):
+            if (not word in self.all_actions) and (not word in self.all_prepositions) and (not word in items.all_nouns) and (not word in items.all_adjectives) and (not word.isdigit()):
                 Print("I don't understand the word \"" + word + "\".")
                 state.oops_index = x
                 oops_words = []
@@ -385,6 +391,10 @@ class ActionsMaster:
                 state.quit_pending = False
                 return
 
+        if state.waiting_for_number and command_words[0].isdigit():
+            self.ParseCommand(state.last_action + " " + command_words[0])
+            return
+
         word_one_item = None
         for item_key in items.items_dictionary:
             if command_words[0] in items.items_dictionary[item_key]["words"]:
@@ -433,6 +443,10 @@ class ActionsMaster:
     # (Note that the word will already have been modified by any adjectives the user provided.)
     # If no resolution is possible, we prompt the user and return None
     def ResolveItem(self, command_word, user_word, is_secondary_item):
+        # If the word is a number, just return the number (as a string)
+        if command_word.isdigit():
+          return command_word
+
         item_candidates = items.MatchStringToItems(command_word)
         
         if len(item_candidates) == 0:
@@ -477,19 +491,23 @@ class ActionsMaster:
         action = self.actions_dictionary[action_key]
         state.this_action = action_key
         state.waiting_for_object = False
+        state.waiting_for_number = False
         state.quit_pending = False
 
         # Handle one word command (e.g. inventory, north, etc)
         if len(command_words) == 1:
             state.this_object = None
             state.parse_successful = True
-            if action.get("requires_object?"):
+            if action.get("requires_object?") or action.get("requires_number?"):
                 if len(command_words[0]) == 1:
                     Print("What do you want to " + str.lower(action["words"][0]) + "?")
-                    state.waiting_for_object = True
                 else:
                     Print("What do you want to " + str.lower(command_words[0]) + "?")
-                    state.waiting_for_object = True
+                
+                if action.get("requires_object?"):
+                  state.waiting_for_object = True
+                else:
+                  state.waiting_for_number = True
                 return
             location_handler = player.GetPlayerLocation()["when_here_handler"]
             if (location_handler != None) and location_handler(context, action, None):
@@ -515,11 +533,27 @@ class ActionsMaster:
             second_item_key = self.ResolveItem(command_words[3], state.this_user_words[3], True)
             if second_item_key == None:
                 return
+            if second_item_key.isdigit():
+                Print("I don't understand that command.")
+                return              
 
-        if (not action.get("requires_object?")) or ((item_key == "ALL") and (not action.get("supports_all?"))):
+        if (item_key == "ALL") and (not action.get("supports_all?")):
             Print("I don't understand that command.")
             return
-        
+
+        if item_key == "NUMBER":
+          items.items_dictionary["NUMBER"]["user_value"] = ""
+
+        if item_key.isdigit():
+          if not action.get("requires_number?"):
+            Print("I don't understand that command.")
+            return
+          items.items_dictionary["NUMBER"]["user_value"] = item_key
+          item_key = "NUMBER"
+        elif not action.get("requires_object?"):
+            Print("I don't understand that command.")
+            return
+
         state.parse_successful = True
         state.this_object = item_key
         item = items.items_dictionary[item_key]
@@ -618,7 +652,7 @@ class ItemsMaster:
 
     # Returns true if the item is present (in inventory or in the room) and visible?
     def TestIfItemIsHere(self, item, word):
-        if item["key"] == "ALL":
+        if (item["key"] == "ALL") or (item["key"] == "NUMBER"):
             return True
         if item["key"] in player.inventory:
             return True
