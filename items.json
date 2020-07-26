@@ -1,37 +1,45 @@
 {
-  "SWORD": {
-    "name": "longsword",
-    "long_desc": "longsword of elvish origin",
-    "examine_string": "This is an ancient sword, probably crafted for a king or an important general. Elven runes cover the hilt, which also contains three large sapphires that shimmer with some magical light.",
-    "words": ["SWORD", "LONGSWORD"],
+  "COIN": {
+    "name": "coin",
+    "long_desc": "shiny silver coin",
+    "examine_string": "This is a shiny silver coin with a picture of a distinguished woman with a block-shaped face",
+    "words": ["COIN"],
     "takeable?": true,
-    "init_loc": "DUNGEON"
-  },
-  "ROCK": {
-    "name": "rock",
-    "words": ["ROCK"],
-    "takeable?": true,
-    "init_loc": "CASTLE_GATE"
+    "init_loc": "PLAYER"
   },
   "TORCH": {
     "name": "torch",
     "long_desc": "flickering torch",
     "words": ["TORCH"],
     "takeable?": true,
-    "light_source?": true,
-    "init_loc": "CASTLE_COURTYARD"
+    "light_source?": true
   },
-  "BEDS": {
-    "name": "beds",
-    "words": ["BED", "BEDS"],
-    "init_loc": "GUARDS_QUARTERS",
+  "FLOWERS": {
+    "name": "attractive yellow flowers",
+    "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
+    "adjectives": ["YELLOW"],
+    "init_loc": "OUTSIDE_DINER",
     "do_not_list?": true
   },
-  "WEAPONS_RACK": {
-    "name": "empty weapons racks",
-    "words": ["WEAPON", "WEAPONS", "RACK", "RACKS"],
-    "init_loc": "GUARDS_QUARTERS",
+  "STREETLAMP": {
+    "name": "white streetlamp",
+    "words": ["LAMP", "STREETLAMP"],
+    "init_loc": "OUTSIDE_DINER",
     "do_not_list?": true
   },
-  "ALL": { "name": "All", "words": "ALL" }
+  "JUKEBOX": {
+    "name": "jukebox",
+    "words": ["JUKEBOX"],
+    "init_loc": "DINER_INTERIOR",
+    "do_not_list?": true
+  },
+  "COINSLOT": {
+    "name": "coin slot",
+    "words": ["SLOT", "COINSLOT"],
+    "adjectives": ["COIN"],
+    "init_loc": "DINER_INTERIOR",
+    "do_not_list?": true
+  },
+  "ALL": { "name": "All", "words": ["ALL"] },
+  "IT": {"name": "It", "words": ["IT"]}
 }

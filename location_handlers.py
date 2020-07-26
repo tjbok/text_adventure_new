@@ -21,4 +21,4 @@ def EnterLookoutWalkway(context, first_time):
 # Here is where you "bind" your item handler function to a specific item.
 def Register(context):
     locations = context.locations
-    locations.AddEnterHandler("LOOKOUT_WALKWAY", EnterLookoutWalkway)
+    #locations.AddEnterHandler("LOOKOUT_WALKWAY", EnterLookoutWalkway)

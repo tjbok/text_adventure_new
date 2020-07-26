@@ -6,6 +6,6 @@ def IntroText(context):
 # This function is called as the game is starting. Use it to initialize game settings
 #  like the player's starting location.
 def InitialSetup(context):
-    context.player.SetPlayerLocation("CASTLE_GATE")
+    context.player.SetPlayerLocation("OUTSIDE_DINER")
     context.actions.swear_words = {"SHIT", "DAMN"}
     context.actions.swear_response = "Hey, watch your language!"
