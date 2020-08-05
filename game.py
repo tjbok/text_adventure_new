@@ -630,11 +630,19 @@ class ItemsMaster:
                 self.all_nouns.append(word)
             self.items_dictionary[item_key]["key"] = item_key
             self.items_dictionary[item_key]["handler"] = None
+
+            # Place item in location(s)
             item_loc = self.items_dictionary[item_key].get("init_loc")
             if item_loc == "PLAYER":
               player.inventory.append(item_key)
             elif not item_loc == None:
-              locations[item_loc]["items"].append(item_key)
+              if isinstance(item_loc, str):
+                locations[item_loc]["items"].append(item_key)
+              elif isinstance(item_loc, list):
+                if self.items_dictionary[item_key].get("takeable?") and (len(item_loc) > 1):
+                  print("ERROR: takeable items can't have multiple init_loc")
+                for il in item_loc:
+                  locations[il]["items"].append(item_key)
 
     # This allows you to type "actions[<key>]" for convenience
     def __getitem__(self, key): return self.items_dictionary[key]

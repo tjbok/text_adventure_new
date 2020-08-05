@@ -19,7 +19,7 @@
     "name": "attractive yellow flowers",
     "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
     "adjectives": ["YELLOW"],
-    "init_loc": "OUTSIDE_DINER",
+    "init_loc": ["OUTSIDE_DINER", "DINER_CORNER"],
     "do_not_list?": true
   },
   "STREETLAMP": {
