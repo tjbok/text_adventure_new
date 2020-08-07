@@ -28,7 +28,11 @@ class Context:
             print(textwrap.fill(string, 75))
 
     def PrintItemInString(self, default_string, item):
-        self.Print(default_string.replace("@", "the " + item.get("name")))
+        default_string = default_string.replace("@", "the " + item.get("name"))
+        if default_string.startswith("the"):
+            default_string = "T" + default_string[1:]
+        self.Print(default_string)
+
 ######################### PLAYER #########################
 
 # This class contains player status information
@@ -134,6 +138,15 @@ class LocationsMaster:
         # Test whether the location key in this location is a string description; if so, print it.
         if ' ' in new_location_key:
           Print(new_location_key)
+        
+        # Test for a door (denoted with the "LOCATION|DOOR" notation)
+        if '|' in new_location_key:
+            new_loc_array = new_location_key.split('|')
+            if not items[new_loc_array[1]].get("is_open?"):
+                Print("The " + items[new_loc_array[1]].get("name") + " is closed.")
+            else:
+                self.EnterRoom(new_loc_array[0])
+
         elif (new_location_key != None) and (len(new_location_key) > 0):
             self.EnterRoom(new_location_key)
         else:
@@ -168,16 +181,7 @@ class LocationsMaster:
 
     # Describes all items in a particular location
     def DescribeItemsInLocation(self):
-        location = self.locations_dictionary[player.location]
-        first_item = True
-        if len(location["items"]) > 0:
-            for item_key in location["items"]:
-                if items[item_key].get("do_not_list?"):
-                    continue
-                if first_item:
-                    print()
-                    first_item = False
-                Print("There is a " + items.GetLongDescription(item_key) + " here.")
+        items.ListItems(self.locations_dictionary[player.location]["items"], decorate = "There is @ here.", article = "a", indent = 0, blank_line = True, announce_if_nothing = False)
 
     # Is the current location dark (and is there no light source in the room or in player inventory?)
     def IsDark(self):
@@ -186,16 +190,11 @@ class LocationsMaster:
             return False
 
         # Dark room ... need to check for light source in room or inventory
-        for item_key in player_loc["items"]:
+        for item_key in items.ListItemsPresent():
             item = items[item_key]
             if (item.get("light_source?")):
                 return False
-
-        for item_key in player.inventory:
-            item = items[item_key]
-            if (item.get("light_source?")):
-                return False
-
+        
         return True
 
 ######################### ACTIONS #########################
@@ -458,7 +457,7 @@ class ActionsMaster:
             item_candidates_available = []
             for item_candidate in item_candidates:
                 item = items.items_dictionary[item_candidate]
-                if (item["key"] in player.inventory) or ((item["key"] in player.GetPlayerLocation()["items"]) and not locations.IsDark()):
+                if (item["key"] in items.ListItemsPresent()) and not locations.IsDark():
                     item_candidates_available.append(item_candidate)
             if len(item_candidates_available) == 0:
                 return item_candidates[0]
@@ -617,6 +616,8 @@ class ItemsMaster:
         with open('items.json') as data_file:
             self.items_dictionary = json.load(data_file)
         for item_key in self.items_dictionary:
+            self.items_dictionary[item_key]["contents"] = []
+        for item_key in self.items_dictionary:
             adjectives_list = self.items_dictionary[item_key].get("adjectives")
             if adjectives_list != None:
               # If adjectives are defined, we add a unique identifier to words list (combine first adj + first noun)
@@ -637,7 +638,22 @@ class ItemsMaster:
               player.inventory.append(item_key)
             elif not item_loc == None:
               if isinstance(item_loc, str):
-                locations[item_loc]["items"].append(item_key)
+
+                # Attempt to place item in location
+                item_placed = False
+                for location_key in locations.locations_dictionary:
+                  if location_key == item_loc:
+                    locations[location_key]["items"].append(item_key)
+                    item_placed = True
+                    break
+                
+                #Attempt to place item in a container
+                if not item_placed:
+                  for container_key in self.items_dictionary:
+                      if (container_key == item_loc) and (self.items_dictionary[container_key].get("is_container?")):
+                        self.items_dictionary[container_key]["contents"].append(item_key)
+                        break
+
               elif isinstance(item_loc, list):
                 if self.items_dictionary[item_key].get("takeable?") and (len(item_loc) > 1):
                   print("ERROR: takeable items can't have multiple init_loc")
@@ -658,16 +674,74 @@ class ItemsMaster:
                 items_list.append(item_key)
         return items_list
 
+    # return list of string keys of items that are available here (in inventory or in room, including open containers)
+    def ListItemsPresent(self):
+        return self.FindItemsInside(player.GetPlayerLocation()["items"].append(player.inventory))
+    
+    # appends the item contents to the end of the item description
+    def AppendItemContentsToDescription(self, item_string, item_key, indent):
+        item = self.items_dictionary[item_key]
+        if item.get("is_container?") and (not item.get("openable?") or item.get("is_open?")):
+            if item_string[len(item_string)-1] == '.':
+                item_string += " It"
+            else:
+                item_string += ", which"
+            if len(item["contents"]) == 0:
+                context.Print(item_string + " is empty")
+            else:
+                context.Print(item_string + " contains:")
+                self.ListItems(item["contents"], indent=indent+2)
+        else:
+            context.Print(item_string)    
+
+    # List a set of items, passed in by key (e.g. player inventory), including container contents
+    def ListItems(self, item_list, decorate = "@", article = "a", indent = 0, blank_line = False, announce_if_nothing = True):
+        if (len(item_list) == 0) and announce_if_nothing:
+            Print(' ' * indent + "Nothing")
+        else:
+            first_item = True
+            if decorate == "":
+                decorate = "@"
+            decorate = decorate.split('@')
+            
+            for item_key in item_list:
+                if self.items_dictionary[item_key].get("do_not_list?"):
+                    continue
+                if first_item:
+                    if blank_line:
+                        print()
+                    first_item = False
+                item_string = ' ' * indent + decorate[0] + self.GetLongDescription(item_key, article) + decorate[1]
+                self.AppendItemContentsToDescription(item_string, item_key, indent)
+
+    # return list of string keys of items in the passed-in list along with any other items contained in these items
+    def FindItemsInside(self, items_list):
+        return_list = items_list
+        for item in items_list:
+            if self.items_dictionary[item].get("is_open?"):
+                return_list.append(self.items_dictionary[item]["contents"])
+        return return_list
+
+    # is this item in the list of item keys (looking into containers)
+    def TestIfItemIsIn(self, item_key, container_contents, container_must_be_open = True):
+        if item_key in container_contents:
+            return True
+        for item in container_contents:
+            if (container_must_be_open and not self.items_dictionary[item].get("is_open?")):
+                return False
+            return(self.TestIfItemIsIn(item_key, self.items_dictionary[item]["contents"]))            
+        return False
+        
     # Returns true if the item is present (in inventory or in the room) and visible?
     def TestIfItemIsHere(self, item, word):
         if (item["key"] == "ALL") or (item["key"] == "NUMBER"):
             return True
-        if item["key"] in player.inventory:
+        if self.TestIfItemIsIn(item["key"], player.inventory):
             return True
         if locations.IsDark():
             self.YouCantSeeItemHere(word)
             return False
-        if not item["key"] in player.GetPlayerLocation()["items"]:
+        if not self.TestIfItemIsIn(item["key"], player.GetPlayerLocation()["items"]):
             self.YouCantSeeItemHere(word)
             return False
         return True
@@ -677,13 +751,22 @@ class ItemsMaster:
         Print("You can't see any " + str.lower(word) + " here!")
 
     # Obtains a long description for the item (with backups if that field hasn't been specified in the locations file)
-    def GetLongDescription(self, item_key):
+    def GetLongDescription(self, item_key, article = ""):
         item = self.items_dictionary[item_key]
         item_desc = item.get("long_desc")
         if (item_desc == None) or (len(item_desc) == 0):
-            return item["name"]
-        else:
-            return item_desc
+            item_desc = item["name"]
+
+        # Add article (a, the), if requested
+        if len(article) > 0:
+            starts_with_vowel = (item_desc[0] in "aeiou")
+            if not article[len(article)-1] == ' ':
+                item_desc = " " + item_desc
+            if (article in ["a","A"]) and starts_with_vowel:
+                item_desc = "n" + item_desc
+            item_desc = article + item_desc
+            
+        return item_desc
 
     # Does a "get all"
     def GetAll(self):
@@ -705,7 +788,13 @@ class ItemsMaster:
     # Does a get on one item
     def GetItem(self, item_key):
         Print("Taken.")
-        player.GetPlayerLocation()["items"].remove(item_key)
+        if item_key in player.GetPlayerLocation()["items"]:
+            player.GetPlayerLocation()["items"].remove(item_key)
+        else:
+            for container_key in self.items_dictionary:
+                if item_key in self.items_dictionary[container_key]["contents"]:
+                    self.items_dictionary[container_key]["contents"].remove(item_key)
+                    
         player.inventory.append(item_key)
 
     # Does a "drop all"

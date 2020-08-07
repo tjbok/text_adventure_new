@@ -8,6 +8,8 @@
   "DROP": { "words": ["DROP", "LEAVE", "TOSS"], "requires_object?": true, "supports_all?": true },
   "ATTACK": { "words": ["ATTACK", "FIGHT", "KILL", "PUNCH", "HIT", "KICK"], "requires_object?": true},
   "EXAMINE": { "words": ["EXAMINE", "X"], "requires_object?": true },
+  "OPEN": { "words": ["OPEN"], "requires_object?": true },
+  "CLOSE": { "words": ["CLOSE", "SHUT"], "requires_object?": true },
   "INVENTORY": { "words": ["INVENTORY", "I", "INV"] },
   "LOOK": { "words": ["LOOK", "L"] },
   "NORTH": { "words": ["NORTH", "N"], "is_move?": true},

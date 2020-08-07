@@ -30,17 +30,37 @@ def Examine(context, item):
     else:
         context.PrintItemInString("You see nothing special about @.", item)
 
+def Open(context, item):
+  if item.get("openable?"):
+    if not item.get("is_open?"):
+      if (item.get("is_container?") and len(item["contents"])):
+        context.Print("Opening the " + item["name"] + " reveals:")
+        context.items.ListItems(item["contents"], indent=2)
+      else:
+        context.PrintItemInString("You open @.", item)
+      item["is_open?"] = True
+    else:
+      context.PrintItemInString("@ is already open.", item)
+  else:
+    context.Print("You can't open that.")
+
+def Close(context, item):
+  if item.get("openable?"):
+    if item.get("is_open?"):
+      context.PrintItemInString("You close @.", item)
+      item["is_open?"] = False
+    else:
+      context.PrintItemInString("@ isn't open.", item)
+  else:
+    context.Print("You can't close that.")
+
 def Inventory(context):
     context.Print("You are carrying:")
-    if len(context.player.inventory) == 0:
-        context.Print("  Nothing")
-    else:
-        for item_key in context.player.inventory:
-            context.Print("  a " + context.items.GetLongDescription(item_key))
+    context.items.ListItems(context.player.inventory, indent=2)    
 
 def Help(context):
     context.Print("This is a text adventure game.")
-    context.Print("Enter commands like \'GO NORTH\' or \'TAKE ROCK\' to tell the computer what you would like to do.")
+    context.Print("Enter commands like \'NORTH\' or \'TAKE COIN\' to tell the computer what you would like to do.")
     context.Print("Most commands are either one or two words.")
     context.Print("For a full list of commands, type \'ACTIONS\'.")
 
@@ -72,6 +92,19 @@ def No(context):
 def Wait(context):
     context.Print("Time passes...")
 
+def Insert(context, item, second_item):
+    if not item["key"] in context.player.inventory:
+        context.PrintItemInString("You're not holding the @.", item)
+    elif (not second_item == None) and second_item.get("is_container?"):
+        if second_item.get("openable?") and not second_item.get("is_open?"):
+            context.PrintItemInString("The @ is closed.", second_item)
+        else:
+            context.Print("Done.")
+            context.player.inventory.remove(item["key"])
+            second_item["contents"].append(item["key"])
+    else:
+      context.Print("You can't do that.")
+
 def Type(context, item):
   if context.player.location == "DINER_INTERIOR":
     context.Print("(on the jukebox keyboard)")
@@ -91,6 +124,7 @@ def TypeOn(context, item, second_item):
     context.Print("To type a number, just say something like 'type 12345'.")
   else:
     if item["user_value"] in ["001","002"]:
+      second_item["awaiting_input?"] = False
       context.Print("The keypad flashes three times, and then the jukebox bounces to life.")
       context.items["JUKEBOX"]["song_choice"] = item["user_value"]
       context.items["JUKEBOX"]["timer"] = 0
@@ -136,6 +170,9 @@ def Register(context):
     actions.AddActionHandler("GET", Get)
     actions.AddActionHandler("DROP", Drop)
     actions.AddActionHandler("EXAMINE", Examine)
+    actions.AddActionHandler("OPEN", Open)
+    actions.AddActionHandler("CLOSE", Close)
+    actions.AddActionHandler("INSERT", Insert)
     actions.AddActionHandler("INVENTORY", Inventory)
     actions.AddActionHandler("HELP", Help)
     actions.AddActionHandler("ACTIONS", Actions)

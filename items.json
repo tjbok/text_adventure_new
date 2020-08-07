@@ -6,7 +6,16 @@
     "words": ["COIN"],
     "adjectives":["SHINY", "SILVER"],
     "takeable?": true,
-    "init_loc": "RECORDING_STUDIO"
+    "init_loc": "BACKPACK"
+  },
+  "DINER_DOOR": {
+    "name": "diner door",
+    "words": ["DOOR"],
+    "adjectives":["DINER"],
+    "init_loc": ["OUTSIDE_DINER","DINER_INTERIOR"],
+    "openable?": true,
+    "is_open?": false,
+    "do_not_list?": true
   },
   "TORCH": {
     "name": "torch",
@@ -55,6 +64,16 @@
     "adjectives": ["PUNCHING"],
     "init_loc": "BOXING_GYM",
     "do_not_list?": true
+  },
+  "BACKPACK": {
+    "name": "backpack",
+    "long_desc": "old leather backpack",
+    "words": ["PACK", "BACKPACK"],
+    "adjectives":["BACK", "OLD", "LEATHER"],
+    "takeable?": true,
+    "openable?": true,
+    "is_container?": true,
+    "init_loc": "PLAYER"
   },
   "ALL": { "name": "All", "words": ["ALL"] },
   "NUMBER": { "name": "Number", "words": ["NUMBER"], "user_value": "" },
