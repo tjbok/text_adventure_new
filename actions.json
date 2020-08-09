@@ -28,6 +28,7 @@
   "WAIT": { "words": ["WAIT", "Z"]},
   "OOPS": {"words": ["OOPS"]},
   "INSERT": { "words": ["INSERT", "PUT"], "requires_object?": true, "prepositions": ["IN", "INTO"]},
-  "TYPE": { "words": ["TYPE"], "requires_number?": true },
-  "TYPE_ON": { "words": ["TYPE"], "requires_number?": true, "prepositions": ["ON", "INTO"]}
+  "TYPE": { "words": ["TYPE"], "requires_object?": true },
+  "TYPE_ON": { "words": ["TYPE"], "requires_object?": true, "prepositions": ["ON", "INTO"]},
+  "DEBUG" : {"words": ["DEBUG"], "suppress_in_actions_list?": true }
 }

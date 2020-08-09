@@ -61,23 +61,46 @@ def Inventory(context):
 def Help(context):
     context.Print("This is a text adventure game.")
     context.Print("Enter commands like \'NORTH\' or \'TAKE COIN\' to tell the computer what you would like to do.")
-    context.Print("Most commands are either one or two words.")
     context.Print("For a full list of commands, type \'ACTIONS\'.")
 
+def PrintAction(context, action_key):
+    print_string = "  "
+
+    for i in range(len(context.actions[action_key]["words"])):
+        if i > 0:
+            print_string += " / "
+        print_string += context.actions[action_key]["words"][i]
+        if context.actions[action_key].get("requires_object?"):
+            print_string += " ITEM"
+        preps = context.actions[action_key].get("prepositions")
+        if preps:
+            print_string += " "
+            for j in range(len(preps)):
+                if (j>0):
+                    print_string += "/"
+                print_string += preps[j]
+            print_string += " ITEM"
+    
+    context.Print(print_string)
+
 def Actions(context):
-    print("Available actions:")
+    print("Movement:")
+    for action_key in context.actions.actions_dictionary:
+        if context.actions[action_key].get("suppress_in_actions_list?"):
+            continue
+        if not context.actions[action_key].get("is_move?"):
+            continue
+
+        PrintAction(context, action_key)
+    
+    print("\nAvailable actions:")
     for action_key in sorted(context.actions.actions_dictionary):
         if context.actions[action_key].get("suppress_in_actions_list?"):
             continue
+        if context.actions[action_key].get("is_move?"):
+            continue
 
-        print_string = "  "
-        i = 0
-        for word in context.actions.actions_dictionary[action_key]["words"]:
-            if i > 0:
-                print_string += " / "
-            print_string += word
-            i += 1
-        context.Print(print_string)
+        PrintAction(context, action_key)
 
 def Quit(context):
     context.state.quit_pending = True
@@ -120,13 +143,13 @@ def TypeOn(context, item, second_item):
     context.Print("Nothing happens.")
   elif not item["key"] == "NUMBER":
     context.Print("You can't type that.")
-  elif item["user_value"] == None:
-    context.Print("To type a number, just say something like 'type 12345'.")
   else:
-    if item["user_value"] in ["001","002"]:
+    keypad_entry = context.state.this_parsed_command[1].user_words[0]
+    print(keypad_entry)
+    if keypad_entry in ["001","002"]:
       second_item["awaiting_input?"] = False
       context.Print("The keypad flashes three times, and then the jukebox bounces to life.")
-      context.items["JUKEBOX"]["song_choice"] = item["user_value"]
+      context.items["JUKEBOX"]["song_choice"] = keypad_entry
       context.items["JUKEBOX"]["timer"] = 0
       context.events.CreateEventInNMoves(PlayJukebox, 0)
     else:
@@ -164,6 +187,10 @@ def Attack(context, item):
   else:
     context.Print("You should try to relax.")
 
+def Debug(context):
+    context.state.debug = True
+    context.Print("Debugging enabled.")
+
 # Here is where you "bind" your action handler function to a specific action.
 def Register(context):
     actions = context.actions
@@ -183,3 +210,4 @@ def Register(context):
     actions.AddActionHandler("TYPE", Type)
     actions.AddActionHandler("TYPE_ON", TypeOn)
     actions.AddActionHandler("ATTACK", Attack)
+    actions.AddActionHandler("DEBUG", Debug)

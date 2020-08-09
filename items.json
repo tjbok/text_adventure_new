@@ -31,7 +31,20 @@
     "init_loc": ["OUTSIDE_DINER", "DINER_CORNER"],
     "do_not_list?": true
   },
-  "STREETLAMP": {
+  "FLOWERS2": {
+    "name": "attractive red flowers",
+    "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
+    "adjectives": ["RED"],
+    "init_loc": ["OUTSIDE_DINER", "DINER_CORNER"],
+    "do_not_list?": true
+  },
+    "FLOWERS3": {
+    "name": "attractive blue flowers",
+    "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
+    "adjectives": ["BLUE"],
+    "init_loc": ["OUTSIDE_DINER"],
+    "do_not_list?": true
+  },  "STREETLAMP": {
     "name": "white streetlamp",
     "words": ["LAMP", "STREETLAMP"],
     "init_loc": "OUTSIDE_DINER",

@@ -33,6 +33,17 @@ class Context:
             default_string = "T" + default_string[1:]
         self.Print(default_string)
 
+
+
+######################### TOKEN #########################
+
+# This class contains token information (for parsed tokens)
+class Token:
+    def __init__(self, token_type, token_key, token_user_words):
+        self.type = token_type
+        self.key = token_key
+        self.user_words = token_user_words
+
 ######################### PLAYER #########################
 
 # This class contains player status information
@@ -60,50 +71,37 @@ class State:
         self.turn_counter = 0
         self.quit_confirmed = False
         self.quit_pending = False
-        self.waiting_for_object = False
-        self.waiting_for_number= False
-        self.waiting_for_second_object = False
-        self.waiting_to_disambiguate_object = False
-        self.waiting_to_disambiguate_second_object = False
+        self.waiting_for_item = False
         self.disambiguate_list = []
-        self.this_action = None
-        self.this_object = None
-        self.this_second_object = None
-        self.last_action = None
-        self.last_object = None
-        self.last_second_object = None
+        self.this_parsed_command = []
+        self.last_parsed_command = []
         self.this_user_input = None
-        self.this_user_words = []
         self.last_user_input = None
-        self.last_user_words = []
         self.parse_successful = False
         self.oops_index = None
         self.oops_words = None
+        self.debug = False
 
-    def ClearFlags(self):
+    def ClearPending(self):
         self.quit_pending = False
-        self.waiting_for_object = False
-        self.waiting_for_number = False
-        self.waiting_for_second_object = False
-        self.waiting_to_disambiguate_object = False
-        self.waiting_to_disambiguate_second_object = False
-        self.last_action = None
-        self.last_object = None
-        self.last_second_object = None
+        self.waiting_for_item = False
+        self.disambiguate_list = []
+        self.this_parsed_command = []
+        self.this_user_input = None
+        self.oops_index = None
+        self.oops_words = None       
 
     # This is called at the end of each turn; it remembers this period's user input and commands for recall next period
     def PostProcess(self):
         if self.parse_successful:
-            if (not self.waiting_for_object) and (not self.waiting_for_second_object) and (not self.waiting_to_disambiguate_object) and (not self.waiting_to_disambiguate_second_object) and (not self.waiting_for_number):
-                events.CheckEvents(self.turn_counter)
-                self.turn_counter += 1
-            self.last_action = self.this_action
-            self.last_object = self.this_object
-            self.last_second_object = self.this_second_object
+            events.CheckEvents(self.turn_counter)
+            self.turn_counter += 1
+            self.last_parsed_command = self.this_parsed_command
             self.last_user_input = self.this_user_input
-            self.last_user_words = self.this_user_words
             self.oops_index = None
             self.oops_words = None
+            self.waiting_for_item = False
+            self.disambiguate_list = []
 
 ######################### LOCATIONS #########################
 
@@ -250,73 +248,95 @@ class ActionsMaster:
                 return True
         return False
 
-    # It can be used to reference the object you mentioned in the last move
-    def HandleIt(self, command_words):
-        for x in range(len(command_words)):
-            if (command_words[x] == "IT"):
-                if len(state.last_user_words) > 1:
-                    command_words[x] = state.last_object
-                    state.this_user_words[x] = state.last_user_words[1]
-                else:
-                    Print("I don't understand what \"IT\" is referring to in that command.")
-                    return False
-        return True
+    # Given a list of words, attempt to resolve to a single item. Complain and return None if this is impossible.
+    def ParseItem(self, command_substring):
+        if state.debug:
+            print("Parse Item: " + ' '.join(command_substring))
+        # Handle "IT"
+        if (len(command_substring) == 1) and (command_substring[0] == "IT"):
+            if (len(state.last_parsed_command) > 1) and (not state.last_parsed_command[1] == None):
+                return state.last_parsed_command[1]
+            else:
+                Print("I don't understand what \"IT\" is referring to in that command.")
+                return None
 
-    # Remove any references to adjectives in the command string
-    def HandleAdjectives(self, command_words):
-      unhandled_adjectives = []
-      for item_key in items.items_dictionary:
-        adjectives_list = items.items_dictionary[item_key].get("adjectives")
-        if adjectives_list != None:
-          for adjective in adjectives_list:
-            indices = [i for i, x in enumerate(command_words) if x == adjective]
-            for adj_index in indices:
-              if (adj_index < len(command_words) - 1) and (command_words[adj_index+1] in items.items_dictionary[item_key]["words"]):
-                # remove the adjective from the input words list
-                del command_words[adj_index]
+        # Handle "ALL"
+        if (len(command_substring) == 1) and (command_substring[0] == "ALL"):
+            return Token("Item","ALL","ALL")
 
-                #...and replace the word with the item's unique ID
-                command_words[adj_index] = adjectives_list[0] + "_" + items.items_dictionary[item_key]["words"][0]
+        # Handle numbers
+        if (len(command_substring) == 1) and (command_substring[0].isdigit()):
+            return Token("Item","NUMBER",[command_substring[0]])
 
-                #...and combine adjective+noun in the words list stored in state
-                state.this_user_words.remove(adjective)
-                state.this_user_words[adj_index] = adjective + " " + state.this_user_words[adj_index]
-              elif not adjective in items.all_nouns:
-                unhandled_adjectives.append(adjective)
-      
-      # Test for adjectives used on the wrong nouns
-      for adjective in unhandled_adjectives:
-        if adjective in command_words:
-          if command_words.index(adjective) < len(command_words) - 1:
-            for item_key in items.items_dictionary:
-                if command_words[command_words.index(adjective)+1] in items.items_dictionary[item_key]["words"]:
-                  Print("You can't see any " + str.lower(adjective) + " " + str.lower(command_words[command_words.index(adjective)+1]) + " here!")
-                  return False
-          Print("I don't understand that use of the word \"" + adjective + "\".")
-          return False
-    
-      return True
+        # First, find all possible item matches for these command words
+        item_candidates = []
 
-    # If we are waiting for the user to disambiguate between several items, detect whether all command words are associated with one of the items
-    def AttemptToDisambiguate(self, command_words):
-        new_disambiguate_list = []
-        for candidate_item in state.disambiguate_list:
-            is_candidate = True
-            item_words = []
-            for item_word in items.items_dictionary[candidate_item]["words"]:
-                item_words.append(item_word)
-            adjectives = items.items_dictionary[candidate_item].get("adjectives")
-            if not adjectives == None:
-                item_words.extend(adjectives)
-            for word in command_words:
-                if not word in item_words:
-                    is_candidate = False
+        # If we are waiting on the player to disambiguate between several items, narrow the search universe to just those items
+        item_universe = items.items_dictionary
+        if len(state.disambiguate_list) > 0:
+            item_universe = state.disambiguate_list
+
+        for item_key in item_universe:
+            mismatch = False
+            for word in command_substring:
+                if (not word in items.items_dictionary[item_key]["words"]) and ((not items.items_dictionary[item_key].get("adjectives")) or (not word in items.items_dictionary[item_key]["adjectives"])):
+                    mismatch = True
                     break
-            if is_candidate:
-                new_disambiguate_list.append(candidate_item)
-        return new_disambiguate_list
+            if not mismatch:
+                item_candidates.append(item_key)
 
-    # Parse the user's command (this is the first function called)
+        if len(item_candidates) == 0:
+            Print("I don't understand that command.")
+            return None
+
+        if len(item_candidates) == 1:
+            # Success!
+            return Token("Item",item_candidates[0],command_substring)
+        
+        # Need to disambiguate. Start by narrowing the candidates to items that are here.
+        item_candidates_here = []
+        for item_candidate in item_candidates:
+            if items.TestIfItemIsIn(item_candidate, player.inventory) or ((not locations.IsDark()) and items.TestIfItemIsIn(item_candidate, player.GetPlayerLocation()["items"])):
+                item_candidates_here.append(item_candidate)
+        
+        if len(item_candidates_here) == 1:
+            # Success!
+            return Token("Item",item_candidates_here[0],command_substring)
+
+        if len(item_candidates_here) == 0:
+            # Player has mentioned several items but none are here. Pick the first candidate and let the ParseAction() function deal with it
+            return Token("Item",item_candidates[0],command_substring)
+
+        # Finally, see if we can narrow the list by ignoring items that were only matched to an adjective
+        item_candidates_here_nounsonly = []
+        for item_candidate in item_candidates_here:
+            for word in command_substring:
+                if word in items.items_dictionary[item_candidate]["words"]:
+                    item_candidates_here_nounsonly.append(item_candidate)
+                    break
+        
+        if len(item_candidates_here_nounsonly) == 1:
+            # Success!
+            return Token("Item",item_candidates_here_nounsonly[0],command_substring)
+
+        if len(item_candidates_here_nounsonly) > 1:
+            item_candidates_here = item_candidates_here_nounsonly
+
+        query_string = "Which " + str.lower(' '.join(command_substring)) + " do you mean:"
+        for item_candidate in item_candidates_here:
+            if item_candidate == item_candidates_here[len(item_candidates_here)-1]:
+                query_string += " or"
+            query_string += " the " + items.items_dictionary[item_candidate]["name"]
+            if (not item_candidate == item_candidates_here[len(item_candidates_here)-1]) and (len(item_candidates_here) > 2):
+                query_string += ","
+        Print(query_string + "?")
+        state.disambiguate_list = []
+        for item_candidate in item_candidates_here:
+                state.disambiguate_list.append(item_candidate)
+        
+        state.waiting_for_item = True
+        return None
+    
     def ParseCommand(self, command_string):
         state.this_user_input = command_string
         state.parse_successful = False
@@ -331,49 +351,18 @@ class ActionsMaster:
         if self.CheckForUnknownWords(command_words):
             return
 
-        if (command_words[0] == "OOPS") and (len(command_words)>1) and (not state.oops_index == None):
-          new_command_words = []
-          for word in state.oops_words:
-            new_command_words.append(word)
-          for x in range(len(command_words)-1):
-              new_command_words.insert(state.oops_index + x, command_words[x+1])
-          command_words = new_command_words
-
-        if state.waiting_to_disambiguate_object:
-            new_disambiguate_list = self.AttemptToDisambiguate(command_words)
-            if len(new_disambiguate_list) == 1:
-                command_words = state.last_user_words
-                command_words[1] = items.items_dictionary[new_disambiguate_list[0]]["words"][0]
-                adjectives = items.items_dictionary[new_disambiguate_list[0]].get("adjectives")
-                if not adjectives is None:
-                    command_words.insert(1, adjectives[0])
-            state.this_user_input = " ".join(command_words)
-            state.waiting_to_disambiguate_object = False
-
-        if state.waiting_to_disambiguate_second_object:
-            new_disambiguate_list = self.AttemptToDisambiguate(command_words)
-            if len(new_disambiguate_list) == 1:
-                command_words = state.last_user_words
-                command_words[3] = items.items_dictionary[new_disambiguate_list[0]]["words"][0]
-                adjectives = items.items_dictionary[new_disambiguate_list[0]].get("adjectives")
-                if not adjectives is None:
-                    command_words.insert(3, adjectives[0])
-            state.this_user_input = " ".join(command_words)
-            state.waiting_to_disambiguate_second_object = False
-
-        state.this_user_words = []
-        for word in command_words:
-          state.this_user_words.append(word)
-
-        if not self.HandleAdjectives(command_words):
-          return
-
-        if not self.HandleIt(command_words):
-            return
-
-        if len(command_words) > 4:
-            Print("That sentence has too many words.")
-            return
+        # Handle OOPS
+        if (command_words[0] == "OOPS"):
+            if (len(command_words)>1) and (not state.oops_index == None):
+                new_command_words = []
+                for word in state.oops_words:
+                    new_command_words.append(word)
+                for x in range(len(command_words)-1):
+                    new_command_words.insert(state.oops_index + x, command_words[x+1])
+                command_words = new_command_words
+            else:
+                Print("You can use 'OOPS' to correct typing mistakes. Just type 'OOPS' and then the word you meant to type.")
+                return
 
         if len(command_string) == 0:
             Print("Eh?")
@@ -389,208 +378,200 @@ class ActionsMaster:
                 Print("Okay, Quit cancelled.")
                 state.quit_pending = False
                 return
-
-        if state.waiting_for_number and command_words[0].isdigit():
-            self.ParseCommand(state.last_action + " " + command_words[0])
+           
+        # Locate prepostions (if any)
+        preposition_index = -1
+        preps_found = 0
+        for x in range(len(command_words)):
+            if command_words[x] in self.all_prepositions:
+                # If a preposition is also a command, then assume it's being used as a command if it's the first word
+                #  Example: 'IN' vs 'PUT COIN IN SLOT'
+                if (x == 0) and (command_words[x] in self.all_actions):
+                    continue
+                preposition_index = x
+                preps_found = preps_found + 1
+        if preps_found > 1:
+            Print("There were too many prepositions in that command.")
             return
 
-        word_one_item = None
-        for item_key in items.items_dictionary:
-            if command_words[0] in items.items_dictionary[item_key]["words"]:
-                word_one_item = item_key
-                break
-
-        # Handle case where we're waiting for the user to type in an item name (after 'what do you want to <action>?')
-        if (word_one_item != None) and state.waiting_for_object:
-            self.ParseCommand(state.last_action + " " + command_words[0])
-            return
-        if (word_one_item != None) and state.waiting_for_second_object:
-            self.ParseCommand(state.last_user_input + " " + command_words[0])
-            return
-
-        if (len(command_words) > 2) and (not command_words[2] in self.all_prepositions):
-            Print("I don't understand the word \"" + command_words[2] + "\" in that context.")
-            return
-
-        action_word = False
+        # Check if first word is an action (the usual type of command)
+        action_matches = []
         for action_key in self.actions_dictionary:
             if command_words[0] in self.actions_dictionary[action_key]["words"]:
-                #Handle 'AGAIN' command
-                if action_key == "AGAIN":
-                    if state.last_user_input == None:
-                      Print("You haven't entered a command yet.")
-                    else:
-                      self.ParseCommand(state.last_user_input)
+                action_matches.append(action_key)
+
+        if len(action_matches) > 0:
+
+            # First word matches at least one action ... may need to disambiguate using prepositions
+            final_action_matches = []
+
+            for potential_match in action_matches:
+                if preps_found and ((not self.actions_dictionary[potential_match].get("prepositions")) or (not command_words[preposition_index] in self.actions_dictionary[potential_match].get("prepositions"))):
+                    continue
+                # Action matched against both action words and prepositions (if any)
+                final_action_matches.append(potential_match)
+
+            if len(final_action_matches) == 0:
+                # Did player type in a preposition that doesn't match this verb?
+                if preps_found > 0:
+                    Print("I don't understand that command.")
                     return
                 
-                action_word = True
-                if len(command_words) <= 2:
-                    self.ParseAction(action_key, command_words)
-                    return
-                prepositions = self.actions_dictionary[action_key].get("prepositions")
-                if (not prepositions == None) and (command_words[2] in prepositions):
-                    self.ParseAction(action_key, command_words)
-                    return
+                # ... or did player just fail to type in a preposition at all ... then assume preposition and proceed
+                final_action_matches.append(action_matches[0])
+            
+            # We assume that the player's action can't be ambiguous at this point
+            # If it is ambiguous, then there are two actions with the same words and matching prepositions (not allowed)
+            # Just in case, we set the action to the first matched action.
+            action_key = final_action_matches[0]
 
-        if action_word or (word_one_item != None):
+            user_action_words = [command_words[0]]
+            if preps_found:
+                user_action_words.append(command_words[preposition_index])
+            state.ClearPending()
+            state.this_parsed_command = [Token("Action", action_key, user_action_words)]
+            
+            if preps_found:
+                # Handle case with two objects, e.g. PUT X IN Y
+                
+                # Can't have preposition right after action or last word in command
+                if (preposition_index < 2) or (preposition_index == len(command_words) - 1):
+                    
+                    Print("I don't understand that command.")
+                    return
+                
+                # Add tokens to parsed_command for objects on either side of the preposition:
+                state.this_parsed_command.append(self.ParseItem(command_words[1:preposition_index]))
+                if not state.this_parsed_command[1] == None:
+                    state.this_parsed_command.append(self.ParseItem(command_words[preposition_index+1:]))
+
+            elif len(command_words) > 1:
+                state.this_parsed_command.append(self.ParseItem(command_words[1:]))
+
+            for this_token in state.this_parsed_command:
+                if not this_token:
+                    return
+            
+        elif state.waiting_for_item:
+            # First word was not an action.
+            # If we reach this point in the code, there are only three valid possibilities:
+            #  (1) We have prompted the player to disambiguate between several items by typing in a more specific item
+            #  (2) We have prompted the player to type in an object ("what do you want to attack?")
+            #  (3) We have prompted the player to type in a number
+
+            # In all three cases, we will parse the command as an item and then attempt to put it into the right spot in the previous parsed command
+            new_token = self.ParseItem(command_words)
+            if not new_token:
+                return
+            if len(state.this_parsed_command) == 1:
+                state.this_parsed_command.append(new_token)
+            elif state.this_parsed_command[1] == None:
+                state.this_parsed_command[1] = new_token
+                if (len(state.this_parsed_command) == 3) and state.this_parsed_command[2] == None:
+                    del state.this_parsed_command[-1]
+            elif len(state.this_parsed_command) == 2:
+                state.this_parsed_command.append(new_token)
+            else:
+                state.this_parsed_command[2] = new_token
+
+        else:
             Print("I don't understand that command.")
             return
 
-        Print("I don't understand the word \"" + command_words[0] + "\" in that context.")
-
-    # For a given item word, figure out the item (if possible) that the user might be referring to.
-    # (Note that the word will already have been modified by any adjectives the user provided.)
-    # If no resolution is possible, we prompt the user and return None
-    def ResolveItem(self, command_word, user_word, is_secondary_item):
-        # If the word is a number, just return the number (as a string)
-        if command_word.isdigit():
-          return command_word
-
-        item_candidates = items.MatchStringToItems(command_word)
-        
-        if len(item_candidates) == 0:
-            Print("I don't understand the word \"" + command_word + "\" in that context.")
-            return None
-        if len(item_candidates) > 1:
-            
-            # First, see if we can resolve ambiguity based on which items are here and visible
-            item_candidates_available = []
-            for item_candidate in item_candidates:
-                item = items.items_dictionary[item_candidate]
-                if (item["key"] in items.ListItemsPresent()) and not locations.IsDark():
-                    item_candidates_available.append(item_candidate)
-            if len(item_candidates_available) == 0:
-                return item_candidates[0]
-            if len(item_candidates_available) == 1:
-                return item_candidates_available[0]
-
-            query_string = "Which " + str.lower(user_word) + " do you mean:"
-            for item_candidate in item_candidates_available:
-                if item_candidate == item_candidates_available[len(item_candidates_available)-1]:
-                    query_string += " or"
-                query_string += " the " + items.items_dictionary[item_candidate]["name"]
-                if (not item_candidate == item_candidates_available[len(item_candidates_available)-1]) and (len(item_candidates_available) > 2):
-                    query_string += ","
-            print(query_string + "?")
-            state.disambiguate_list = []
-            for item_candidate in item_candidates_available:
-                 state.disambiguate_list.append(item_candidate)
-            if is_secondary_item:
-                state.parse_successful = True
-                state.waiting_to_disambiguate_second_object = True
+        # Check for incomplete commands, like "OPEN" or "PUT COIN", and prompt for more words if necessary
+        if actions.actions_dictionary[action_key].get("requires_object?") and (len(state.this_parsed_command) == 1):
+            Print("What do you want to " + state.this_parsed_command[0].user_words[0].lower() + "?")
+            state.waiting_for_item = True
+        elif actions.actions_dictionary[action_key].get("prepositions") and len(state.this_parsed_command) < 3:
+            prompt_string = "What do you want to " + state.this_parsed_command[0].user_words[0].lower() + " the " + ' '.join(state.this_parsed_command[1].user_words).lower() + " "
+            if len(state.this_parsed_command[0].user_words) == 2:
+                prompt_string += state.this_parsed_command[0].user_words[1].lower()
             else:
-                state.parse_successful = True
-                state.waiting_to_disambiguate_object = True
-            return None
+                prompt_string += actions.actions_dictionary[action_key]["prepositions"][0].lower()
+            Print(prompt_string + "?")    
+            state.waiting_for_item = True
+        else:
+            # Successful parse!
 
-        return item_candidates[0]
+            # Handle AGAIN
+            if (action_key == "AGAIN") and (len(state.this_parsed_command) == 1):
+                if not state.last_parsed_command:
+                    Print("You can't type 'AGAIN' before doing something.")
+                    return
+                state.this_parsed_command = []
+                for t in state.last_parsed_command:
+                    state.this_parsed_command.append(t)
 
-    # Once we know what action the user has typed, we continue parsing (this is the second parsing function called)
-    def ParseAction(self, action_key, command_words):
-        action = self.actions_dictionary[action_key]
-        state.this_action = action_key
-        state.waiting_for_object = False
-        state.waiting_for_number = False
-        state.quit_pending = False
+            self.ParseAction(state.this_parsed_command)
 
-        # Handle one word command (e.g. inventory, north, etc)
-        if len(command_words) == 1:
-            state.this_object = None
-            state.parse_successful = True
-            if action.get("requires_object?") or action.get("requires_number?"):
-                if len(command_words[0]) == 1:
-                    Print("What do you want to " + str.lower(action["words"][0]) + "?")
-                else:
-                    Print("What do you want to " + str.lower(command_words[0]) + "?")
-                
-                if action.get("requires_object?"):
-                  state.waiting_for_object = True
-                else:
-                  state.waiting_for_number = True
+    # Once we have parsed the command into tokens with at least one action, we continue to parse...
+    def ParseAction(self, parsed_command):
+        
+        state.parse_successful = True
+        # (setting this flag means that this command is considered parsed and counts as a player turn)
+
+        # Obtain objects for action and items (if any) and make sure any referenced items are present
+        action = self.actions_dictionary[parsed_command[0].key]
+        if state.debug:
+            print("ACTION: " + action["key"])
+        item1 = None
+        if len(parsed_command) > 1:
+            if not action.get("requires_object?"):
+                Print("I don't understand that command.")
                 return
-            location_handler = player.GetPlayerLocation()["when_here_handler"]
-            if (location_handler != None) and location_handler(context, action, None):
+            item1 = items.items_dictionary[parsed_command[1].key]
+            if state.debug:
+                print("ITEM1: " + item1["key"])
+            if not items.TestIfItemIsHere(item1, ' '.join(parsed_command[1].user_words)):
                 return
-            elif not action["handler"] == None:
+            if (item1["key"] == "ALL") and not action.get("supports_all?"):
+                self.PrintActionDefault(action)
+                return
+        item2 = None
+        if len(parsed_command) > 2:
+            item2 = items.items_dictionary[parsed_command[2].key]
+            if state.debug:
+                print("ITEM2: " + item2["key"])
+            if not items.TestIfItemIsHere(item2, ' '.join(parsed_command[2].user_words)):
+                return
+            if (item2["key"] == "ALL") and not action.get("supports_all?"):
+                self.PrintActionDefault(action)
+                return
+
+        # Check location handler
+        location_handler = player.GetPlayerLocation().get("when_here_handler")
+        if location_handler and location_handler(context, action, item1, item2):
+            return
+
+        # Handle 1-word commands
+        if len(parsed_command) == 1:
+            if not action["handler"] == None:
                 action["handler"](context)
             elif action.get("is_move?"):
-                locations.HandleMove(action_key)
-            elif action_key == "LOOK":
+                locations.HandleMove(action["key"])
+            elif action["key"] == "LOOK":
                 locations.DoLook()
             else:
                 self.PrintActionDefault(action)
             return
 
-        # Handle standard two or four word command (e.g. get sword or insert coin in slot)
-        # First word is action, second is item, third (optional) is preposition, fourth (optional) is secondary item
-        item_key = self.ResolveItem(command_words[1], state.this_user_words[1], False)
-        if item_key == None:
-            return
-
-        second_item_key = None
-        if len(command_words) == 4:
-            second_item_key = self.ResolveItem(command_words[3], state.this_user_words[3], True)
-            if second_item_key == None:
-                return
-            if second_item_key.isdigit():
-                Print("I don't understand that command.")
-                return              
-
-        if (item_key == "ALL") and (not action.get("supports_all?")):
-            Print("I don't understand that command.")
-            return
-
-        if item_key == "NUMBER":
-          items.items_dictionary["NUMBER"]["user_value"] = ""
-
-        if item_key.isdigit():
-          if not action.get("requires_number?"):
-            Print("I don't understand that command.")
-            return
-          items.items_dictionary["NUMBER"]["user_value"] = item_key
-          item_key = "NUMBER"
-        elif not action.get("requires_object?"):
-            Print("I don't understand that command.")
-            return
-
-        state.parse_successful = True
-        state.this_object = item_key
-        item = items.items_dictionary[item_key]
-        if second_item_key == None:
-            second_item = None
-        else:
-            second_item = items.items_dictionary[second_item_key]
-
-        if not items.TestIfItemIsHere(item, state.this_user_words[1]):
-            return
-        if (not second_item_key == None) and (not items.TestIfItemIsHere(second_item, state.this_user_words[3])):
-            return
-
-        # Okay, at this point we have a good-looking multi-word command.
-        # We recognize all words and any items references are visible.
-
-        # First, test if there is a location handler for this location...
-        location_handler = player.GetPlayerLocation()["when_here_handler"]
-        if (location_handler != None) and location_handler(context, action, item, second_item):
-            return
-
         # Next, test if there is an item handler for this item that handles the command...
-        handler = item["handler"]
-        if (not handler == None) and handler(context, action, second_item, False):
+        handler = item1["handler"]
+        if (not handler == None) and handler(context, action, item2, False):
             return
 
         # Next, test if there is an item handler for the secondary item that handles the command...
-        if not second_item_key == None:
-            handler = second_item["handler"]
-            if (not handler == None) and handler(context, action, item, True):
+        if not item2 == None:
+            handler = item2["handler"]
+            if (not handler == None) and handler(context, action, item1, True):
                 return
 
         # ...and if not, check for an action handler
         if not action["handler"] == None:
-            if action.get("prepositions") == None:
-                action["handler"](context, item)
+            if action.get("prepositions"):
+                action["handler"](context, item1, item2)
             else:
-                action["handler"](context, item, second_item)
+                action["handler"](context, item1)
 
         # If there is no item or action handler that covers this command, print the default result
         else:
@@ -727,9 +708,8 @@ class ItemsMaster:
         if item_key in container_contents:
             return True
         for item in container_contents:
-            if (container_must_be_open and not self.items_dictionary[item].get("is_open?")):
-                return False
-            return(self.TestIfItemIsIn(item_key, self.items_dictionary[item]["contents"]))            
+            if self.TestIfItemIsIn(item_key, self.items_dictionary[item]["contents"]) and ((not container_must_be_open) or self.items_dictionary[item].get("is_open?")):
+                return True            
         return False
         
     # Returns true if the item is present (in inventory or in the room) and visible?
