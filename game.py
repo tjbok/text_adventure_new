@@ -123,15 +123,15 @@ class LocationsMaster:
 
     # Add a function to trigger on entering this location
     def AddEnterHandler(self, loc_key, handler):
-        self.locations_dictionary[loc_key]["enter_handler"] = handler
+        self[loc_key]["enter_handler"] = handler
 
     # Add a function to run as a handler whenever the player is at this location
     def AddWhenHereHandler(self, loc_key, handler):
-        self.locations_dictionary[loc_key]["when_here_handler"] = handler
+        self[loc_key]["when_here_handler"] = handler
 
     # This function handles a move in a certain direction.
     def HandleMove(self, direction):
-        new_location_key = self.locations_dictionary[player.location].get(str.lower(direction))
+        new_location_key = self[player.location].get(str.lower(direction))
         
         # Test whether the location key in this location is a string description; if so, print it.
         if ' ' in new_location_key:
@@ -152,7 +152,7 @@ class LocationsMaster:
 
     # This function moves the player to a new location and prints room location
     def EnterRoom(self, new_location_key):
-        new_location = self.locations_dictionary[new_location_key]
+        new_location = self[new_location_key]
         first_time_here = not new_location["touched?"]
         enter_handler = new_location.get("enter_handler")
         if (enter_handler != None) and enter_handler(context, first_time_here):
@@ -168,7 +168,7 @@ class LocationsMaster:
 
     # This function implements a LOOK action
     def DoLook(self):
-        location = self.locations_dictionary[player.location]
+        location = self[player.location]
         Print(location["brief_desc"])
         if self.IsDark():
             Print("It is pitch dark in here.")
@@ -179,7 +179,7 @@ class LocationsMaster:
 
     # Describes all items in a particular location
     def DescribeItemsInLocation(self):
-        items.ListItems(self.locations_dictionary[player.location]["items"], decorate = "There is @ here.", article = "a", indent = 0, blank_line = True, announce_if_nothing = False)
+        items.ListItems(self[player.location]["items"], decorate = "There is @ here.", article = "a", indent = 0, blank_line = True, announce_if_nothing = False)
 
     # Is the current location dark (and is there no light source in the room or in player inventory?)
     def IsDark(self):
@@ -224,7 +224,7 @@ class ActionsMaster:
 
     # Add a function to handle an action
     def AddActionHandler(self, action_key, handler):
-        self.actions_dictionary[action_key]["handler"] = handler
+        self[action_key]["handler"] = handler
 
     # Is this word in the list of swears (defined in the globals)
     def CheckForSwear(self, word):
@@ -248,7 +248,7 @@ class ActionsMaster:
                 return True
         return False
 
-    # Given a list of words, attempt to resolve to a single item. Complain and return None if this is impossible.
+    # Given a list of words, attempt to resolve to a single item in the game. Complain and return None if this is impossible.
     def ParseItem(self, command_substring):
         if state.debug:
             print("Parse Item: " + ' '.join(command_substring))
@@ -279,7 +279,7 @@ class ActionsMaster:
         for item_key in item_universe:
             mismatch = False
             for word in command_substring:
-                if (not word in items.items_dictionary[item_key]["words"]) and ((not items.items_dictionary[item_key].get("adjectives")) or (not word in items.items_dictionary[item_key]["adjectives"])):
+                if (not word in items[item_key]["words"]) and ((not items[item_key].get("adjectives")) or (not word in items[item_key]["adjectives"])):
                     mismatch = True
                     break
             if not mismatch:
@@ -311,7 +311,7 @@ class ActionsMaster:
         item_candidates_here_nounsonly = []
         for item_candidate in item_candidates_here:
             for word in command_substring:
-                if word in items.items_dictionary[item_candidate]["words"]:
+                if word in items[item_candidate]["words"]:
                     item_candidates_here_nounsonly.append(item_candidate)
                     break
         
@@ -326,7 +326,7 @@ class ActionsMaster:
         for item_candidate in item_candidates_here:
             if item_candidate == item_candidates_here[len(item_candidates_here)-1]:
                 query_string += " or"
-            query_string += " the " + items.items_dictionary[item_candidate]["name"]
+            query_string += " the " + items[item_candidate]["name"]
             if (not item_candidate == item_candidates_here[len(item_candidates_here)-1]) and (len(item_candidates_here) > 2):
                 query_string += ","
         Print(query_string + "?")
@@ -337,6 +337,7 @@ class ActionsMaster:
         state.waiting_for_item = True
         return None
     
+    # Here is the main command parser function. You pass in a string and it parses it into known tokens and then reacts to them.
     def ParseCommand(self, command_string):
         state.this_user_input = command_string
         state.parse_successful = False
@@ -379,7 +380,7 @@ class ActionsMaster:
                 state.quit_pending = False
                 return
            
-        # Locate prepostions (if any)
+        # Locate prepositions in the command (if any)
         preposition_index = -1
         preps_found = 0
         for x in range(len(command_words)):
@@ -397,7 +398,7 @@ class ActionsMaster:
         # Check if first word is an action (the usual type of command)
         action_matches = []
         for action_key in self.actions_dictionary:
-            if command_words[0] in self.actions_dictionary[action_key]["words"]:
+            if command_words[0] in self[action_key]["words"]:
                 action_matches.append(action_key)
 
         if len(action_matches) > 0:
@@ -406,7 +407,7 @@ class ActionsMaster:
             final_action_matches = []
 
             for potential_match in action_matches:
-                if preps_found and ((not self.actions_dictionary[potential_match].get("prepositions")) or (not command_words[preposition_index] in self.actions_dictionary[potential_match].get("prepositions"))):
+                if preps_found and ((not self[potential_match].get("prepositions")) or (not command_words[preposition_index] in self[potential_match].get("prepositions"))):
                     continue
                 # Action matched against both action words and prepositions (if any)
                 final_action_matches.append(potential_match)
@@ -479,15 +480,15 @@ class ActionsMaster:
             return
 
         # Check for incomplete commands, like "OPEN" or "PUT COIN", and prompt for more words if necessary
-        if actions.actions_dictionary[action_key].get("requires_object?") and (len(state.this_parsed_command) == 1):
+        if actions[action_key].get("requires_object?") and (len(state.this_parsed_command) == 1):
             Print("What do you want to " + state.this_parsed_command[0].user_words[0].lower() + "?")
             state.waiting_for_item = True
-        elif actions.actions_dictionary[action_key].get("prepositions") and len(state.this_parsed_command) < 3:
+        elif actions[action_key].get("prepositions") and len(state.this_parsed_command) < 3:
             prompt_string = "What do you want to " + state.this_parsed_command[0].user_words[0].lower() + " the " + ' '.join(state.this_parsed_command[1].user_words).lower() + " "
             if len(state.this_parsed_command[0].user_words) == 2:
                 prompt_string += state.this_parsed_command[0].user_words[1].lower()
             else:
-                prompt_string += actions.actions_dictionary[action_key]["prepositions"][0].lower()
+                prompt_string += actions[action_key]["prepositions"][0].lower()
             Print(prompt_string + "?")    
             state.waiting_for_item = True
         else:
@@ -511,7 +512,7 @@ class ActionsMaster:
         # (setting this flag means that this command is considered parsed and counts as a player turn)
 
         # Obtain objects for action and items (if any) and make sure any referenced items are present
-        action = self.actions_dictionary[parsed_command[0].key]
+        action = self[parsed_command[0].key]
         if state.debug:
             print("ACTION: " + action["key"])
         item1 = None
@@ -519,7 +520,7 @@ class ActionsMaster:
             if not action.get("requires_object?"):
                 Print("I don't understand that command.")
                 return
-            item1 = items.items_dictionary[parsed_command[1].key]
+            item1 = items[parsed_command[1].key]
             if state.debug:
                 print("ITEM1: " + item1["key"])
             if not items.TestIfItemIsHere(item1, ' '.join(parsed_command[1].user_words)):
@@ -529,12 +530,12 @@ class ActionsMaster:
                 return
         item2 = None
         if len(parsed_command) > 2:
-            item2 = items.items_dictionary[parsed_command[2].key]
+            item2 = items[parsed_command[2].key]
             if state.debug:
                 print("ITEM2: " + item2["key"])
             if not items.TestIfItemIsHere(item2, ' '.join(parsed_command[2].user_words)):
                 return
-            if (item2["key"] == "ALL") and not action.get("supports_all?"):
+            if item2["key"] == "ALL":
                 self.PrintActionDefault(action)
                 return
 
@@ -645,13 +646,13 @@ class ItemsMaster:
     def __getitem__(self, key): return self.items_dictionary[key]
 
     def AddItemHandler(self, item_key, handler):
-        self.items_dictionary[item_key]["handler"] = handler
+        self[item_key]["handler"] = handler
 
     # Check dictionary for item string
     def MatchStringToItems(self, item_string):
         items_list = []
         for item_key in self.items_dictionary:
-            if item_string in self.items_dictionary[item_key]["words"]:
+            if item_string in self[item_key]["words"]:
                 items_list.append(item_key)
         return items_list
 
@@ -661,7 +662,7 @@ class ItemsMaster:
     
     # appends the item contents to the end of the item description
     def AppendItemContentsToDescription(self, item_string, item_key, indent):
-        item = self.items_dictionary[item_key]
+        item = self[item_key]
         if item.get("is_container?") and (not item.get("openable?") or item.get("is_open?")):
             if item_string[len(item_string)-1] == '.':
                 item_string += " It"
@@ -686,7 +687,7 @@ class ItemsMaster:
             decorate = decorate.split('@')
             
             for item_key in item_list:
-                if self.items_dictionary[item_key].get("do_not_list?"):
+                if self[item_key].get("do_not_list?"):
                     continue
                 if first_item:
                     if blank_line:
@@ -699,8 +700,8 @@ class ItemsMaster:
     def FindItemsInside(self, items_list):
         return_list = items_list
         for item in items_list:
-            if self.items_dictionary[item].get("is_open?"):
-                return_list.append(self.items_dictionary[item]["contents"])
+            if self[item].get("is_open?"):
+                return_list.append(self[item]["contents"])
         return return_list
 
     # is this item in the list of item keys (looking into containers)
@@ -708,7 +709,7 @@ class ItemsMaster:
         if item_key in container_contents:
             return True
         for item in container_contents:
-            if self.TestIfItemIsIn(item_key, self.items_dictionary[item]["contents"]) and ((not container_must_be_open) or self.items_dictionary[item].get("is_open?")):
+            if self.TestIfItemIsIn(item_key, self[item]["contents"]) and ((not container_must_be_open) or self[item].get("is_open?")):
                 return True            
         return False
         
@@ -732,7 +733,7 @@ class ItemsMaster:
 
     # Obtains a long description for the item (with backups if that field hasn't been specified in the locations file)
     def GetLongDescription(self, item_key, article = ""):
-        item = self.items_dictionary[item_key]
+        item = self[item_key]
         item_desc = item.get("long_desc")
         if (item_desc == None) or (len(item_desc) == 0):
             item_desc = item["name"]
@@ -772,8 +773,8 @@ class ItemsMaster:
             player.GetPlayerLocation()["items"].remove(item_key)
         else:
             for container_key in self.items_dictionary:
-                if item_key in self.items_dictionary[container_key]["contents"]:
-                    self.items_dictionary[container_key]["contents"].remove(item_key)
+                if item_key in self[container_key]["contents"]:
+                    self[container_key]["contents"].remove(item_key)
                     
         player.inventory.append(item_key)
 

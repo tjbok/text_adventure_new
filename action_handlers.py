@@ -64,23 +64,26 @@ def Help(context):
     context.Print("For a full list of commands, type \'ACTIONS\'.")
 
 def PrintAction(context, action_key):
-    print_string = "  "
+    print_string = "  " + context.actions[action_key]["words"][0]
+    if context.actions[action_key].get("requires_object?"):
+            print_string += " ITEM"
+    preps = context.actions[action_key].get("prepositions")
+    if preps:
+        print_string += " "
+        for j in range(len(preps)):
+            if (j>0):
+                print_string += "/"
+            print_string += preps[j]
+        print_string += " ITEM"
 
-    for i in range(len(context.actions[action_key]["words"])):
-        if i > 0:
-            print_string += " / "
-        print_string += context.actions[action_key]["words"][i]
-        if context.actions[action_key].get("requires_object?"):
-            print_string += " ITEM"
-        preps = context.actions[action_key].get("prepositions")
-        if preps:
-            print_string += " "
-            for j in range(len(preps)):
-                if (j>0):
-                    print_string += "/"
-                print_string += preps[j]
-            print_string += " ITEM"
-    
+    if len(context.actions[action_key]["words"]) > 1:
+        print_string += " ... (or "
+        for i in range(1,len(context.actions[action_key]["words"])):
+            if i > 1:
+                print_string += "/"
+            print_string += context.actions[action_key]["words"][i]
+        print_string += ")"
+        
     context.Print(print_string)
 
 def Actions(context):
