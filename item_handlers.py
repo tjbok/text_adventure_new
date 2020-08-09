@@ -2,6 +2,34 @@
 
 # To add a new item handler, first create a function for your item
 #  and then "bind" the handler to your item in the bottom section of the file.
+# Note that action handlers take four arguments:
+#   1) context -- your link to all of the actions, items, locations, player, state variables, etc.
+#   2) action -- the *object* (not key) representing the action the player has just selected
+#   3) other_item -- (may be None) the object for the other item in the player's command (if any)
+#   4) item_is_secondary -- True if the item (the item whose handler this is) was the secondary
+#        item in the player's command. For example, in the Backpack() handler, if the player command
+#        was "PUT COIN IN BACKPACK" then the other_item would be the backpack
+#        and item_is_secondary will be true.
+
+# NOTES ON ITEMS.JSON
+#    "name" : the item's short name (e.g. "coin")
+#    "long_desc" : [optional] the item's slightly longer description (e.g. "shiny silver coin")
+#    "examine_string" : string shown when the player examines the item (can also handle this in an item handler)
+#    "words" : a list of noun words for the object (e.g. ["BACKPACK", "PACK"])
+#    "adjectives": an optional list of adjectives the player can use to modify the nouns (e.g. ["SHINY", "SILVER"])
+#    "takeable?" : true if the item can be taken, dropped, and placed in inventory
+#    "init_loc" : the initial location of the item. Options include
+#          -- "PLAYER" = player's inventory
+#          -- location key (e.g. "WEST_OF_HOUSE")
+#          -- list of location keys (use this if the item is in multiple places, like a door or a generic bed
+#               that's reused in multiple rooms)
+#    "light_source?" : true if the item can currently be used as a light source (can be toggled for a flashlight)
+#    "openable?" : true if the item can be opened -- like a door or backpack
+#    "is_open?" : true if the item is currently open (used for doors or containers)
+#    "is_locked?" : true if the item is currently locked (used for doors or containers)
+#    "do_not_list?" : true if the item shouldn't show up when the player does a LOOK
+#    "is_container?" : true if the item can be used as a container
+#   ...and you can arbitrarily assign attributes to items (see the jukebox in this example game)
 
 def Coin(context, action, other_item, item_is_secondary):
     if ((action["key"] == "INSERT") or (action["key"] == "PUT_INTO")) and (not item_is_secondary):
@@ -63,6 +91,7 @@ def Number(context, action, other_item, item_is_secondary):
                 context.Print("The keypad flashes three times, and then the jukebox bounces to life.")
                 context.items["JUKEBOX"]["song_choice"] = keypad_entry
                 context.items["JUKEBOX"]["timer"] = 0
+                context.items["JUKEBOX"]["playing?"] = True
                 context.events.CreateEventInNMoves(PlayJukebox, 0)
                 return True
 
@@ -95,6 +124,8 @@ def PlayJukebox(context):
   context.items["JUKEBOX"]["timer"] = context.items["JUKEBOX"]["timer"] + 1
   if context.items["JUKEBOX"]["timer"] < 5:
     context.events.CreateEventInNMoves(PlayJukebox, 1)
+  else:
+    context.items["JUKEBOX"]["playing?"] = False
 
 def PunchingBag(context, action, other_item, item_is_secondary):
     if action["key"] == "ATTACK":
@@ -109,6 +140,9 @@ def Flashlight(context, action, other_item, item_is_secondary):
         else:
             context.items["FLASHLIGHT"]["light_source?"] = True
             context.Print("You switch on the flashlight.")
+            if not context.locations[context.player.location]["touched?"]:
+                context.Print("")
+                context.locations.DoLook()
         return True
     if action["key"] == "TURN_OFF":
         if context.items["FLASHLIGHT"].get("light_source?"):

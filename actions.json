@@ -27,6 +27,7 @@
   "AGAIN": { "words": ["AGAIN", "G"]},
   "WAIT": { "words": ["WAIT", "Z"]},
   "OOPS": {"words": ["OOPS"]},
+  "DANCE": {"words": ["DANCE"]},
   "INSERT": { "words": ["INSERT"], "requires_object?": true, "suppress_in_actions_list?": true},
   "PUT_INTO": { "words": ["PUT","INSERT"], "requires_object?": true, "prepositions": ["INTO","IN","INSIDE"]},
   "TYPE": { "words": ["TYPE"], "requires_object?": true, "suppress_in_actions_list?": true },

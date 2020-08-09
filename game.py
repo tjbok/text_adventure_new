@@ -129,6 +129,10 @@ class LocationsMaster:
     def AddWhenHereHandler(self, loc_key, handler):
         self[loc_key]["when_here_handler"] = handler
 
+    # Add a function to run as a handler whenever the player is at this location
+    def AddLookHandler(self, loc_key, handler):
+        self[loc_key]["look_handler"] = handler
+
     # This function handles a move in a certain direction.
     def HandleMove(self, direction):
         new_location_key = self[player.location].get(str.lower(direction))
@@ -145,7 +149,7 @@ class LocationsMaster:
             else:
                 self.EnterRoom(new_loc_array[0])
        
-        if self.IsDark() and ((new_location_key == None) or (len(new_location_key) == 0) or not locations[new_location_key].get("touched?")):
+        elif self.IsDark() and ((new_location_key == None) or (len(new_location_key) == 0) or not locations[new_location_key].get("touched?")):
             Print("It's hard to tell in the dark if it's possible to move in that location.")
 
         elif (new_location_key != None) and (len(new_location_key) > 0):
@@ -177,7 +181,11 @@ class LocationsMaster:
             Print("It is pitch dark in here.")
         else:
             location["touched?"] = True
-            Print(location["long_desc"])
+            look_handler = locations[player.location].get("look_handler")
+            if look_handler:
+                look_handler(context)
+            else:
+                Print(location["long_desc"])
             self.DescribeItemsInLocation()
 
     # Describes all items in a particular location
@@ -738,7 +746,8 @@ class ItemsMaster:
         return_list = items_list
         for item in items_list:
             if self[item].get("is_open?"):
-                return_list.append(self[item]["contents"])
+                for item_inside in self[item]["contents"]:
+                    return_list.append(item_inside)
         return return_list
 
     # is this item in the list of item keys (looking into containers)
