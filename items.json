@@ -17,34 +17,36 @@
     "is_open?": false,
     "do_not_list?": true
   },
-  "TORCH": {
-    "name": "torch",
-    "long_desc": "flickering torch",
-    "words": ["TORCH"],
+  "FLASHLIGHT": {
+    "name": "flashlight",
+    "words": ["FLASHLIGHT","LIGHT"],
+    "adjectives":["SHINY", "SILVER"],
     "takeable?": true,
-    "light_source?": true
+    "light_source?": false,
+    "init_loc": "RECORDING_STUDIO"
   },
-  "FLOWERS": {
+  "YELLOW_FLOWERS": {
     "name": "attractive yellow flowers",
     "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
     "adjectives": ["YELLOW"],
     "init_loc": ["OUTSIDE_DINER", "DINER_CORNER"],
     "do_not_list?": true
   },
-  "FLOWERS2": {
+  "RED_FLOWERS": {
     "name": "attractive red flowers",
     "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
     "adjectives": ["RED"],
     "init_loc": ["OUTSIDE_DINER", "DINER_CORNER"],
     "do_not_list?": true
   },
-    "FLOWERS3": {
+  "BLUE_FLOWERS": {
     "name": "attractive blue flowers",
     "words": ["FLOWER", "FLOWERS", "POT", "POTS", "FLOWERPOT", "FLOWERPOTS"],
     "adjectives": ["BLUE"],
     "init_loc": ["OUTSIDE_DINER"],
     "do_not_list?": true
-  },  "STREETLAMP": {
+  },  
+  "STREETLAMP": {
     "name": "white streetlamp",
     "words": ["LAMP", "STREETLAMP"],
     "init_loc": "OUTSIDE_DINER",

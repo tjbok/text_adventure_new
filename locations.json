@@ -1,7 +1,7 @@
 {
   "OUTSIDE_DINER": {
     "brief_desc": "Outside Diner",
-    "long_desc": "You are standing on the sidewalk outside a modern storefront with rakish white lines and curved glass. Above your head, massive pink letters spell out DINER. Attractive yellow flowers are growing in pots on the sidewalk, and there is a white streetlamp beside the diner door. The street continues to the east and west, and there is a large park to the south.",
+    "long_desc": "You are standing on the sidewalk outside a modern storefront with rakish white lines and curved glass. Above your head, massive pink letters spell out DINER. Attractive yellow, red, and blue flowers are growing in pots on the sidewalk, and there is a white streetlamp beside the diner door. The street continues to the east and west, and there is a large park to the south.",
     "dark?": false,
     "north":"DINER_INTERIOR|DINER_DOOR",
     "south": "You start to cross the street to the park but notice there is no crosswalk and return to the safety of the sidewalk.",
@@ -35,7 +35,7 @@
   },
     "DINER_CORNER": {
     "brief_desc": "Diner Corner",
-    "long_desc": "You are standing at the corner of the diner's block. You can see the diner's interior through a large, curved window. The street continues to the east and west, and there is a large park to the south. A narrow set of stairs lead up to the businesses above the diner.",
+    "long_desc": "You are standing at the corner of the diner's block. You can see the diner's interior through a large, curved window. Attractive yellow and red flowers are growing in pots on the sidewalk. The street continues to the east and west, and there is a large park to the south. A narrow set of stairs lead up to the businesses above the diner.",
     "dark?": false,
     "north": "",
     "south": "You start to cross the street to the park but notice there is no crosswalk and return to the safety of the sidewalk.",
@@ -87,7 +87,7 @@
     "BOXING_GYM": {
     "brief_desc": "Boxing Gym",
     "long_desc": "You are inside a boxing gym, rigged up with the latest equipment including a really inviting-looking punching bag. A doorway west leads back out to the landing.",
-    "dark?": false,
+    "dark?": true,
     "north": "",
     "south": "",
     "east": "",

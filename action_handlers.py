@@ -4,6 +4,9 @@
 #  and then "bind" the handler to your action in the bottom section of the file.
 # Unlike location or item handlers, note that if you define an action handler, you NEED
 #  to handle every user input
+#
+# Ideally, these action handlers are generic and don't reference specific items or locations.
+# But that's up to you...
 
 def Get(context, item):
     if item["key"] == "ALL":
@@ -33,7 +36,9 @@ def Examine(context, item):
 def Open(context, item):
   if item.get("openable?"):
     if not item.get("is_open?"):
-      if (item.get("is_container?") and len(item["contents"])):
+      if item.get("is_locked?"):
+        context.PrintItemInString("@ is locked.", item)
+      elif (item.get("is_container?") and len(item["contents"])):
         context.Print("Opening the " + item["name"] + " reveals:")
         context.items.ListItems(item["contents"], indent=2)
       else:
@@ -54,6 +59,12 @@ def Close(context, item):
   else:
     context.Print("You can't close that.")
 
+def TurnOn(context, item):
+    context.Print("You can't turn that on.")
+
+def TurnOff(context, item):
+    context.Print("You can't turn that off.")
+
 def Inventory(context):
     context.Print("You are carrying:")
     context.items.ListItems(context.player.inventory, indent=2)    
@@ -66,7 +77,7 @@ def Help(context):
 def PrintAction(context, action_key):
     print_string = "  " + context.actions[action_key]["words"][0]
     if context.actions[action_key].get("requires_object?"):
-            print_string += " ITEM"
+            print_string += " item"
     preps = context.actions[action_key].get("prepositions")
     if preps:
         print_string += " "
@@ -74,7 +85,8 @@ def PrintAction(context, action_key):
             if (j>0):
                 print_string += "/"
             print_string += preps[j]
-        print_string += " ITEM"
+        if not context.actions[action_key].get("no_second_item?"):
+            print_string += " item"
 
     if len(context.actions[action_key]["words"]) > 1:
         print_string += " ... (or "
@@ -96,7 +108,7 @@ def Actions(context):
 
         PrintAction(context, action_key)
     
-    print("\nAvailable actions:")
+    print("\nOther actions:")
     for action_key in sorted(context.actions.actions_dictionary):
         if context.actions[action_key].get("suppress_in_actions_list?"):
             continue
@@ -118,7 +130,10 @@ def No(context):
 def Wait(context):
     context.Print("Time passes...")
 
-def Insert(context, item, second_item):
+def Insert(context, item):
+    context.Print("You can't insert that.")    
+
+def PutIn(context, item, second_item):
     if not item["key"] in context.player.inventory:
         context.PrintItemInString("You're not holding the @.", item)
     elif (not second_item == None) and second_item.get("is_container?"):
@@ -132,67 +147,17 @@ def Insert(context, item, second_item):
       context.Print("You can't do that.")
 
 def Type(context, item):
-  if context.player.location == "DINER_INTERIOR":
-    context.Print("(on the jukebox keyboard)")
-    context.Print("")
-    TypeOn(context, item, context.items["KEYPAD"])
-  else:
-    context.Print("You can't see any way to type things here.")
+    context.Print("You can't type that.")
 
 def TypeOn(context, item, second_item):
-  if not second_item["key"] == "KEYPAD":
-    context.Print("You can't type things on that!")
-  elif not second_item["awaiting_input?"]:
-    context.Print("Nothing happens.")
-  elif not item["key"] == "NUMBER":
-    context.Print("You can't type that.")
-  else:
-    keypad_entry = context.state.this_parsed_command[1].user_words[0]
-    print(keypad_entry)
-    if keypad_entry in ["001","002"]:
-      second_item["awaiting_input?"] = False
-      context.Print("The keypad flashes three times, and then the jukebox bounces to life.")
-      context.items["JUKEBOX"]["song_choice"] = keypad_entry
-      context.items["JUKEBOX"]["timer"] = 0
-      context.events.CreateEventInNMoves(PlayJukebox, 0)
-    else:
-      context.Print("Nothing happens.")
-
-def PlayJukebox(context):
-  aha = ["We're talking away ... I don't know what ... I'm to say ...", "...TAAAAAAKE OOOOON MEEEEE (Take On Me)...", "...It's no better to be safe than sorry...", "... I'LL BEEEEEE GOOOOOOOOONE ...", "...Slowly learning that life is okay ..."]
-
-  nas = ["Yeah, I'm gonna take my horse to the old town road...", "...Got the boots that's black to match...", "...I been in the valley ... You ain't been up off that porch, now...", "...Can't nobody tell me nothin'...", "...Cowboy hat from Gucci ... Wrangler on my booty..."]
-
-  if context.player.location == "DINER_INTERIOR":
-    printstr = "\nThe jukebox"
-    if context.items["JUKEBOX"]["timer"] == 0:
-      printstr += " begins playing a song slightly too loud for comfort"
-    else:
-      printstr += " is playing a loud song"
-    printstr += ": \""
-    if context.items["JUKEBOX"]["song_choice"] == "001":
-      printstr += aha[context.items["JUKEBOX"]["timer"]]
-    elif context.items["JUKEBOX"]["song_choice"] == "002":
-      printstr += nas[context.items["JUKEBOX"]["timer"]]
-    printstr += "\""
-    if context.items["JUKEBOX"]["timer"] == 4:
-      printstr += "\n\nThe song fades in its closing moments, and the jukebox once again is silent."
-    context.Print(printstr)
-  elif context.player.location == "OUTSIDE_DINER":
-    context.Print("\nYou can hear the jukebox playing from inside the diner.")
-  context.items["JUKEBOX"]["timer"] = context.items["JUKEBOX"]["timer"] + 1
-  if context.items["JUKEBOX"]["timer"] < 5:
-    context.events.CreateEventInNMoves(PlayJukebox, 1)
+    context.Print("You can't do that.")
 
 def Attack(context, item):
-  if item["key"] == "PUNCHING_BAG":
-    context.Print("You take some whacks at the punching bag. Ouch, that kind of hurt!")
-  else:
     context.Print("You should try to relax.")
 
 def Debug(context):
-    context.state.debug = True
-    context.Print("Debugging enabled.")
+    context.state.debug = not context.state.debug
+    context.Print("Debugging toggled.")
 
 # Here is where you "bind" your action handler function to a specific action.
 def Register(context):
@@ -203,6 +168,7 @@ def Register(context):
     actions.AddActionHandler("OPEN", Open)
     actions.AddActionHandler("CLOSE", Close)
     actions.AddActionHandler("INSERT", Insert)
+    actions.AddActionHandler("PUT_INTO", PutIn)
     actions.AddActionHandler("INVENTORY", Inventory)
     actions.AddActionHandler("HELP", Help)
     actions.AddActionHandler("ACTIONS", Actions)
@@ -214,3 +180,5 @@ def Register(context):
     actions.AddActionHandler("TYPE_ON", TypeOn)
     actions.AddActionHandler("ATTACK", Attack)
     actions.AddActionHandler("DEBUG", Debug)
+    actions.AddActionHandler("TURN_ON", TurnOn)
+    actions.AddActionHandler("TURN_OFF", TurnOff)

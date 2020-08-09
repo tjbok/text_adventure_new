@@ -144,6 +144,9 @@ class LocationsMaster:
                 Print("The " + items[new_loc_array[1]].get("name") + " is closed.")
             else:
                 self.EnterRoom(new_loc_array[0])
+       
+        if self.IsDark() and ((new_location_key == None) or (len(new_location_key) == 0) or not locations[new_location_key].get("touched?")):
+            Print("It's hard to tell in the dark if it's possible to move in that location.")
 
         elif (new_location_key != None) and (len(new_location_key) > 0):
             self.EnterRoom(new_location_key)
@@ -237,7 +240,7 @@ class ActionsMaster:
     def CheckForUnknownWords(self, command_words):
         for x in range(len(command_words)):
             word = command_words[x]
-            if (not word in self.all_actions) and (not word in self.all_prepositions) and (not word in items.all_nouns) and (not word in items.all_adjectives) and (not word.isdigit()):
+            if (not word in self.all_actions) and (not word in self.all_prepositions) and (not word in items.all_nouns) and (not word in items.all_adjectives) and (not word.isdigit()) and (not word in ["GO","THE","A"]):
                 Print("I don't understand the word \"" + word + "\".")
                 state.oops_index = x
                 oops_words = []
@@ -252,6 +255,12 @@ class ActionsMaster:
     def ParseItem(self, command_substring):
         if state.debug:
             print("Parse Item: " + ' '.join(command_substring))
+        
+        command_substring = [x for x in command_substring if not x in["THE","A"]]
+        if command_substring == []:
+            Print("I don't understand that command.")
+            return None
+        
         # Handle "IT"
         if (len(command_substring) == 1) and (command_substring[0] == "IT"):
             if (len(state.last_parsed_command) > 1) and (not state.last_parsed_command[1] == None):
@@ -348,7 +357,18 @@ class ActionsMaster:
         for word in command_words:
             if self.CheckForSwear(word):
                 return
-                
+        
+        # Basically just ignore "GO" (e.g. "GO NORTH" or "GO INSIDE")
+        if command_words[0] == "GO":
+            if len(command_words) == 1:
+                Print("Where would you like to go?")
+                return
+            del command_words[0]
+
+        if len(command_string) == 0:
+            Print("Eh?")
+            return
+            
         if self.CheckForUnknownWords(command_words):
             return
 
@@ -364,10 +384,6 @@ class ActionsMaster:
             else:
                 Print("You can use 'OOPS' to correct typing mistakes. Just type 'OOPS' and then the word you meant to type.")
                 return
-
-        if len(command_string) == 0:
-            Print("Eh?")
-            return
 
         # Handle case where we're waiting to see if the user confirmed a QUIT (by typing Y or N)
         if state.quit_pending and (len(command_words) == 1):
@@ -433,18 +449,28 @@ class ActionsMaster:
             state.this_parsed_command = [Token("Action", action_key, user_action_words)]
             
             if preps_found:
+                # Handle case with one object, e.g. TURN ON FLASHLIGHT
+                if self[action_key].get("no_second_item?"):
+                    user_item_words = []
+                    for x in range(1,len(command_words)):
+                        if not x == preposition_index:
+                            user_item_words.append(command_words[x])
+                    if len(user_item_words) > 0:
+                        state.this_parsed_command.append(self.ParseItem(user_item_words))
+                
                 # Handle case with two objects, e.g. PUT X IN Y
-                
-                # Can't have preposition right after action or last word in command
-                if (preposition_index < 2) or (preposition_index == len(command_words) - 1):
+                else:
+                                     
+                    # Can't have preposition right after action or last word in command
+                    if (preposition_index < 2) or (preposition_index == len(command_words) - 1):
+                        
+                        Print("I don't understand that command.")
+                        return
                     
-                    Print("I don't understand that command.")
-                    return
-                
-                # Add tokens to parsed_command for objects on either side of the preposition:
-                state.this_parsed_command.append(self.ParseItem(command_words[1:preposition_index]))
-                if not state.this_parsed_command[1] == None:
-                    state.this_parsed_command.append(self.ParseItem(command_words[preposition_index+1:]))
+                    # Add tokens to parsed_command for objects on either side of the preposition:
+                    state.this_parsed_command.append(self.ParseItem(command_words[1:preposition_index]))
+                    if not state.this_parsed_command[1] == None:
+                        state.this_parsed_command.append(self.ParseItem(command_words[preposition_index+1:]))
 
             elif len(command_words) > 1:
                 state.this_parsed_command.append(self.ParseItem(command_words[1:]))
@@ -481,9 +507,15 @@ class ActionsMaster:
 
         # Check for incomplete commands, like "OPEN" or "PUT COIN", and prompt for more words if necessary
         if actions[action_key].get("requires_object?") and (len(state.this_parsed_command) == 1):
-            Print("What do you want to " + state.this_parsed_command[0].user_words[0].lower() + "?")
+            prompt_string = "What do you want to " + state.this_parsed_command[0].user_words[0].lower()
+            if actions[action_key].get("no_second_item?"):
+                if preps_found:
+                    prompt_string += " " + command_words[preposition_index].lower()
+                elif actions[action_key].get("prepositions"):
+                    prompt_string += " " + actions[action_key]["prepositions"][0].lower()
+            Print(prompt_string + "?")
             state.waiting_for_item = True
-        elif actions[action_key].get("prepositions") and len(state.this_parsed_command) < 3:
+        elif actions[action_key].get("prepositions") and (not actions[action_key].get("no_second_item?")) and len(state.this_parsed_command) < 3:
             prompt_string = "What do you want to " + state.this_parsed_command[0].user_words[0].lower() + " the " + ' '.join(state.this_parsed_command[1].user_words).lower() + " "
             if len(state.this_parsed_command[0].user_words) == 2:
                 prompt_string += state.this_parsed_command[0].user_words[1].lower()
@@ -569,7 +601,7 @@ class ActionsMaster:
 
         # ...and if not, check for an action handler
         if not action["handler"] == None:
-            if action.get("prepositions"):
+            if action.get("prepositions") and (not action.get("no_second_item?")):
                 action["handler"](context, item1, item2)
             else:
                 action["handler"](context, item1)
@@ -658,7 +690,12 @@ class ItemsMaster:
 
     # return list of string keys of items that are available here (in inventory or in room, including open containers)
     def ListItemsPresent(self):
-        return self.FindItemsInside(player.GetPlayerLocation()["items"].append(player.inventory))
+        items_present = []
+        for item in player.inventory:
+            items_present.append(item)
+        for item in player.GetPlayerLocation()["items"]:
+            items_present.append(item)
+        return self.FindItemsInside(items_present)
     
     # appends the item contents to the end of the item description
     def AppendItemContentsToDescription(self, item_string, item_key, indent):
