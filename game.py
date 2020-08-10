@@ -358,8 +358,7 @@ class ActionsMaster:
     def ParseCommand(self, command_string):
         state.this_user_input = command_string
         state.parse_successful = False
-        command_string = str.upper(command_string).replace("PICK UP", "GET").replace("L AT", "EXAMINE").replace(
-            "LOOK AT", "EXAMINE").strip()
+        command_string = str.upper(command_string).strip()
         command_words = command_string.split(' ')
 
         for word in command_words:
@@ -486,7 +485,12 @@ class ActionsMaster:
             for this_token in state.this_parsed_command:
                 if not this_token:
                     return
-            
+
+            # Handle actions that mimic other actions
+            mimic_action = self[action_key].get("mimic")
+            if mimic_action:
+                state.this_parsed_command[0].key = mimic_action
+
         elif state.waiting_for_item:
             # First word was not an action.
             # If we reach this point in the code, there are only three valid possibilities:
