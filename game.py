@@ -432,6 +432,8 @@ class ActionsMaster:
             for potential_match in action_matches:
                 if preps_found and ((not self[potential_match].get("prepositions")) or (not command_words[preposition_index] in self[potential_match].get("prepositions"))):
                     continue
+                if (not preps_found) and (self[potential_match].get("prepositions")):
+                    continue
                 # Action matched against both action words and prepositions (if any)
                 final_action_matches.append(potential_match)
 
@@ -567,7 +569,8 @@ class ActionsMaster:
             item1 = items[parsed_command[1].key]
             if state.debug:
                 print("ITEM1: " + item1["key"])
-            if not items.TestIfItemIsHere(item1, ' '.join(parsed_command[1].user_words)):
+            if not items.TestIfItemIsHere(item1):
+                items.YouCantSeeItemHere(' '.join(parsed_command[1].user_words))
                 return
             if (item1["key"] == "ALL") and not action.get("supports_all?"):
                 self.PrintActionDefault(action)
@@ -577,7 +580,8 @@ class ActionsMaster:
             item2 = items[parsed_command[2].key]
             if state.debug:
                 print("ITEM2: " + item2["key"])
-            if not items.TestIfItemIsHere(item2, ' '.join(parsed_command[2].user_words)):
+            if not items.TestIfItemIsHere(item2):
+                items.YouCantSeeItemHere(' '.join(parsed_command[2].user_words))
                 return
             if item2["key"] == "ALL":
                 self.PrintActionDefault(action)
@@ -692,13 +696,14 @@ class ItemsMaster:
     def AddItemHandler(self, item_key, handler):
         self[item_key]["handler"] = handler
 
-    # Check dictionary for item string
-    def MatchStringToItems(self, item_string):
-        items_list = []
-        for item_key in self.items_dictionary:
-            if item_string in self[item_key]["words"]:
-                items_list.append(item_key)
-        return items_list
+    # Returns the key of an item, checking first to see if the item is already a key
+    # Point of this is to make it easy to create helper functions that take an item
+    #  as a parameter and allow you to pass in either the item or the item's key
+    def ItemKey(self, item):
+        if isinstance(item,str):
+            return item
+        else:
+            return item["key"]
 
     # return list of string keys of items that are available here (in inventory or in room, including open containers)
     def ListItemsPresent(self):
@@ -755,25 +760,23 @@ class ItemsMaster:
         return return_list
 
     # is this item in the list of item keys (looking into containers)
-    def TestIfItemIsIn(self, item_key, container_contents, container_must_be_open = True):
+    def TestIfItemIsIn(self, item, container_contents, container_must_be_open = True):
+        item_key = self.ItemKey(item)
         if item_key in container_contents:
             return True
         for item in container_contents:
             if self.TestIfItemIsIn(item_key, self[item]["contents"]) and ((not container_must_be_open) or self[item].get("is_open?")):
                 return True            
         return False
-        
+
     # Returns true if the item is present (in inventory or in the room) and visible?
-    def TestIfItemIsHere(self, item, word):
-        if (item["key"] == "ALL") or (item["key"] == "NUMBER"):
+    def TestIfItemIsHere(self, item):
+        item_key = self.ItemKey(item)
+        if (item_key == "ALL") or (item_key == "NUMBER"):
             return True
-        if self.TestIfItemIsIn(item["key"], player.inventory):
+        if self.TestIfItemIsIn(item_key, player.inventory):
             return True
-        if locations.IsDark():
-            self.YouCantSeeItemHere(word)
-            return False
-        if not self.TestIfItemIsIn(item["key"], player.GetPlayerLocation()["items"]):
-            self.YouCantSeeItemHere(word)
+        if locations.IsDark() or (not self.TestIfItemIsIn(item_key, player.GetPlayerLocation()["items"])):
             return False
         return True
 
@@ -782,7 +785,8 @@ class ItemsMaster:
         Print("You can't see any " + str.lower(word) + " here!")
 
     # Obtains a long description for the item (with backups if that field hasn't been specified in the locations file)
-    def GetLongDescription(self, item_key, article = ""):
+    def GetLongDescription(self, item, article = ""):
+        item_key = self.ItemKey(item)
         item = self[item_key]
         item_desc = item.get("long_desc")
         if (item_desc == None) or (len(item_desc) == 0):
@@ -817,7 +821,8 @@ class ItemsMaster:
             Print("There is nothing here to take!")
 
     # Does a get on one item
-    def GetItem(self, item_key):
+    def GetItem(self, item):
+        item_key = self.ItemKey(item)
         Print("Taken.")
         if item_key in player.GetPlayerLocation()["items"]:
             player.GetPlayerLocation()["items"].remove(item_key)
@@ -844,7 +849,8 @@ class ItemsMaster:
             self.DropItem(item_key)
 
     # Does a drop on one item
-    def DropItem(self, item_key):
+    def DropItem(self, item):
+        item_key = self.ItemKey(item)
         Print("Dropped.")
         player.GetPlayerLocation()["items"].append(item_key)
         player.inventory.remove(item_key)
