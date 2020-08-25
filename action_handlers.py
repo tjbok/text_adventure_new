@@ -36,6 +36,18 @@ def Get(context, item):
     else:
         context.items.GetItem(item["key"])
 
+def GetFrom(context, item, second_item):
+    if item["key"] == "ALL":
+        context.items.GetAllFrom(second_item)
+    else:
+        contents = second_item.get("contents")
+        if (not contents) or (not item["key"] in contents):
+            context.PrintItemInString("@ isn't inside that.", item)
+        elif (not item.get("takeable?")):
+            context.Print("You can't pick that up!")
+        else:
+            context.items.GetItem(item["key"])
+
 def Drop(context, item):
     if item["key"] == "ALL":
         context.items.DropAll()
@@ -142,6 +154,10 @@ def Quit(context):
     context.state.quit_pending = True
     context.Print("Are you sure you want to quit (Y/N)?")
 
+def Restart(context):
+    context.state.restart_pending = True
+    context.Print("Are you sure you want to restart (Y/N)?")
+
 def Yes(context):
     context.Print("You sound really positive!")
 
@@ -155,10 +171,14 @@ def Insert(context, item):
     context.Print("You can't insert that.")    
 
 def PutIn(context, item, second_item):
-    if not item["key"] in context.player.inventory:
+    if item["key"] == "ALL":
+        context.items.PutAllIn(second_item)
+    elif not item["key"] in context.player.inventory:
         context.PrintItemInString("You're not holding the @.", item)
     elif (not second_item == None) and second_item.get("is_container?"):
-        if second_item.get("openable?") and not second_item.get("is_open?"):
+        if (item["key"] == second_item["key"]) or context.items.TestIfItemIsIn(second_item, item):
+            context.Print("That's impossible!")
+        elif second_item.get("openable?") and not second_item.get("is_open?"):
             context.PrintItemInString("The @ is closed.", second_item)
         else:
             context.Print("Done.")
@@ -184,6 +204,7 @@ def Debug(context):
 def Register(context):
     actions = context.actions
     actions.AddActionHandler("GET", Get)
+    actions.AddActionHandler("GET_FROM", GetFrom)
     actions.AddActionHandler("DROP", Drop)
     actions.AddActionHandler("EXAMINE", Examine)
     actions.AddActionHandler("OPEN", Open)
@@ -194,6 +215,7 @@ def Register(context):
     actions.AddActionHandler("HELP", Help)
     actions.AddActionHandler("ACTIONS", Actions)
     actions.AddActionHandler("QUIT", Quit)
+    actions.AddActionHandler("RESTART", Restart)
     actions.AddActionHandler("YES", Yes)
     actions.AddActionHandler("NO", No)
     actions.AddActionHandler("WAIT", Wait)

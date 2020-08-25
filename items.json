@@ -90,7 +90,7 @@
     "is_container?": true,
     "init_loc": "PLAYER"
   },
-  "ALL": { "name": "All", "words": ["ALL"] },
+  "ALL": { "name": "All", "words": ["ALL"], "no_article?": true },
   "NUMBER": { "name": "Number", "words": ["NUMBER"], "user_value": "" },
   "IT": {"name": "It", "words": ["IT"]}
 }

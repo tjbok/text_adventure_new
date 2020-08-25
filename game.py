@@ -63,6 +63,13 @@ class Player:
     def GetPlayerLocation(self):
         return locations[self.location]
 
+    def Kill(self, death_text = "*** YOU HAVE DIED! ***"):
+        Print(death_text)
+        Print("")
+        Print("Do you want to restart (Y/N)?")
+        state.restart_pending = True
+        self.hp = 0
+
 ######################### GLOBAL CONDITIONS #########################
 
 # This class is used to track various state variables and history
@@ -71,6 +78,8 @@ class State:
         self.turn_counter = 0
         self.quit_confirmed = False
         self.quit_pending = False
+        self.restart_confirmed = False
+        self.restart_pending = False
         self.waiting_for_item = False
         self.disambiguate_list = []
         self.this_parsed_command = []
@@ -84,6 +93,7 @@ class State:
 
     def ClearPending(self):
         self.quit_pending = False
+        self.restart_pending = False
         self.waiting_for_item = False
         self.disambiguate_list = []
         self.this_parsed_command = []
@@ -279,7 +289,7 @@ class ActionsMaster:
 
         # Handle "ALL"
         if (len(command_substring) == 1) and (command_substring[0] == "ALL"):
-            return Token("Item","ALL","ALL")
+            return Token("Item","ALL",["ALL"])
 
         # Handle numbers
         if (len(command_substring) == 1) and (command_substring[0].isdigit()):
@@ -402,7 +412,22 @@ class ActionsMaster:
                 Print("Okay, Quit cancelled.")
                 state.quit_pending = False
                 return
-           
+
+        # Handle case where we're waiting to see if the user confirmed a RESTART (by typing Y or N)
+        if state.restart_pending and (len(command_words) == 1):
+            if (command_string == 'Y') or (command_string == 'YES'):
+                Print("Restarting...\n\n")
+                state.restart_confirmed = True
+                return
+            if (command_string == 'N') or (command_string == 'NO'):
+                if (player.hp <= 0):
+                    Print("Quitting...")
+                    state.quit_confirmed = True
+                else:
+                    Print("Okay, Restart cancelled.")
+                    state.restart_pending = False
+                return
+
         # Locate prepositions in the command (if any)
         preposition_index = -1
         preps_found = 0
@@ -504,6 +529,7 @@ class ActionsMaster:
             new_token = self.ParseItem(command_words)
             if not new_token:
                 return
+            action_key = state.this_parsed_command[0].key
             if len(state.this_parsed_command) == 1:
                 state.this_parsed_command.append(new_token)
             elif state.this_parsed_command[1] == None:
@@ -530,7 +556,10 @@ class ActionsMaster:
             Print(prompt_string + "?")
             state.waiting_for_item = True
         elif actions[action_key].get("prepositions") and (not actions[action_key].get("no_second_item?")) and len(state.this_parsed_command) < 3:
-            prompt_string = "What do you want to " + state.this_parsed_command[0].user_words[0].lower() + " the " + ' '.join(state.this_parsed_command[1].user_words).lower() + " "
+            prompt_string = "What do you want to " + state.this_parsed_command[0].user_words[0].lower()
+            if not items[state.this_parsed_command[1].key].get("no_article?"):
+                prompt_string += " the"
+            prompt_string += " " + ' '.join(state.this_parsed_command[1].user_words).lower() + " "
             if len(state.this_parsed_command[0].user_words) == 2:
                 prompt_string += state.this_parsed_command[0].user_words[1].lower()
             else:
@@ -664,31 +693,13 @@ class ItemsMaster:
 
             # Place item in location(s)
             item_loc = self.items_dictionary[item_key].get("init_loc")
-            if item_loc == "PLAYER":
-              player.inventory.append(item_key)
-            elif not item_loc == None:
-              if isinstance(item_loc, str):
-
-                # Attempt to place item in location
-                item_placed = False
-                for location_key in locations.locations_dictionary:
-                  if location_key == item_loc:
-                    locations[location_key]["items"].append(item_key)
-                    item_placed = True
-                    break
-                
-                #Attempt to place item in a container
-                if not item_placed:
-                  for container_key in self.items_dictionary:
-                      if (container_key == item_loc) and (self.items_dictionary[container_key].get("is_container?")):
-                        self.items_dictionary[container_key]["contents"].append(item_key)
-                        break
-
-              elif isinstance(item_loc, list):
+            if isinstance(item_loc, str):
+                self.PlaceItemIn(item_key, item_loc)
+            elif isinstance(item_loc, list):
                 if self.items_dictionary[item_key].get("takeable?") and (len(item_loc) > 1):
                   print("ERROR: takeable items can't have multiple init_loc")
                 for il in item_loc:
-                  locations[il]["items"].append(item_key)
+                  self.PlaceItemIn(item_key, il)
 
     # This allows you to type "actions[<key>]" for convenience
     def __getitem__(self, key): return self.items_dictionary[key]
@@ -760,8 +771,17 @@ class ItemsMaster:
         return return_list
 
     # is this item in the list of item keys (looking into containers)
-    def TestIfItemIsIn(self, item, container_contents, container_must_be_open = True):
+    def TestIfItemIsIn(self, item, container, container_must_be_open = True):
         item_key = self.ItemKey(item)
+        container_contents = []
+        if isinstance(container, list):
+            container_contents = container
+        else:
+            container_key = self.ItemKey(container)
+            contents = self[container_key].get("contents")
+            if contents:
+                container_contents = contents
+
         if item_key in container_contents:
             return True
         for item in container_contents:
@@ -820,6 +840,30 @@ class ItemsMaster:
         if taken_items == 0:
             Print("There is nothing here to take!")
 
+    # Does a "get all from"
+    def GetAllFrom(self, container):
+        container_key = self.ItemKey(container)
+
+        # Is this a container?
+        if (not self[container_key].get("is_container?")) and (not self[container_key].get("contents")):
+            Print("You can't do that.")
+            return
+
+        # Need to make a copy of the list of items to get first (because we're updating loc["items"] in the loop
+        get_list = []
+        for item_key in self[container_key]["contents"]:
+            get_list.append(item_key)
+
+        taken_items = 0
+        for item_key in get_list:
+            if self[item_key].get("takeable?"):
+                print(self[item_key]["name"].capitalize() + " : ", end='')
+                self.GetItem(item_key)
+                taken_items += 1
+
+        if taken_items == 0:
+            Print("There is nothing inside to take!")
+
     # Does a get on one item
     def GetItem(self, item):
         item_key = self.ItemKey(item)
@@ -848,12 +892,78 @@ class ItemsMaster:
             print(items[item_key]["name"].capitalize() + " : ", end='')
             self.DropItem(item_key)
 
+    def PutAllIn(self, container):
+        container_key = self.ItemKey(container)
+
+        if self[container_key].get("openable?") and not self[container_key].get("is_open?"):
+            context.PrintItemInString("The @ is closed.", self[container_key])
+            return
+
+        # Need to make a copy of the list of items to put first (because we're updating player.inventory in the loop
+        put_list = []
+        for item_key in player.inventory:
+            if (not item_key == container_key) and (not self.TestIfItemIsIn(container_key, item_key)):
+                put_list.append(item_key)
+
+        if len(put_list) == 0:
+            print_str = "You aren't carrying anything"
+            if len(player.inventory) >= 1:
+                print_str += " that you can place in the pack"
+            Print(print_str + "!")
+            return
+
+        for item_key in put_list:
+            print(items[item_key]["name"].capitalize() + " : Done.")
+            self.MoveItemTo(item_key, container_key)
+
     # Does a drop on one item
     def DropItem(self, item):
         item_key = self.ItemKey(item)
         Print("Dropped.")
         player.GetPlayerLocation()["items"].append(item_key)
         player.inventory.remove(item_key)
+
+    # Removes an item from the game (can always be re-added to inventory or a location or container)
+    def RemoveItemFromGame(self, item):
+        item_key = self.ItemKey(item)
+        if item_key in player.inventory:
+            player.inventory.remove(item_key)
+        for container_key in self.items_dictionary:
+            contents = self[container_key].get("contents")
+            if contents and (item_key in contents):
+                self[container_key]["contents"].remove(item_key)
+        for location_key in locations.locations_dictionary:
+            contents = locations.locations_dictionary[location_key].get("items")
+            if contents and (item_key in contents):
+                self[location_key]["items"].remove(item_key)
+
+    # Moves an item from its current location to a new location (location can also be "PLAYER" or a container item key)
+    def MoveItemTo(self, item, location_key):
+        item_key = self.ItemKey(item)
+        self.RemoveItemFromGame(item_key)
+        self.PlaceItemIn(item_key, location_key)
+
+    # Places an item in a new location (location can also be "PLAYER" or a container item key)
+    # (Doesn't remove item from any locations it may already be; location_key cannot be a list)
+    def PlaceItemIn(self, item, location_key):
+        item_key = self.ItemKey(item)
+        if location_key == "PLAYER":
+            player.inventory.append(item_key)
+        elif not location_key == None:
+            # Attempt to place item in location
+            item_placed = False
+            for place_key in locations.locations_dictionary:
+                if place_key == location_key:
+                    locations[place_key]["items"].append(item_key)
+                    item_placed = True
+                    break
+
+            # Attempt to place item in a container
+            if not item_placed:
+                for container_key in self.items_dictionary:
+                    if (container_key == location_key) and (self.items_dictionary[container_key].get("is_container?")):
+                        self.items_dictionary[container_key]["contents"].append(item_key)
+                        break
 
 ######################### EVENTS #########################
 
@@ -914,13 +1024,27 @@ location_handlers.Register(context)
 
 # Here is the MAIN LOOP
 def Play():
-    globals.IntroText(context)
-    globals.InitialSetup(context)
-    locations.DoLook()
     while not state.quit_confirmed:
-        print()
-        actions.ParseCommand(input("> "))
-        state.PostProcess()
+        globals.IntroText(context)
+        globals.InitialSetup(context)
+        locations.DoLook()
+        while not (state.quit_confirmed or state.restart_confirmed):
+            print()
+            actions.ParseCommand(input("> "))
+            state.PostProcess()
+
+        # Handle restart
+        if state.restart_confirmed:
+            player.__init__()
+            locations.__init__()
+            actions.__init__()
+            items.__init__()
+            events.__init__()
+            state.__init__()
+            context.__init__(player, locations, actions, items, state, events)
+            action_handlers.Register(context)
+            item_handlers.Register(context)
+            location_handlers.Register(context)
 
 if __name__ == "__main__":
-    Play()
+   Play()
