@@ -64,7 +64,8 @@ class Player:
         return locations[self.location]
 
     def Kill(self, death_text = "*** YOU HAVE DIED! ***"):
-        Print(death_text)
+        if death_text:
+            Print("\n" + death_text)
         Print("")
         Print("Do you want to restart (Y/N)?")
         state.restart_pending = True
@@ -375,13 +376,6 @@ class ActionsMaster:
             if self.CheckForSwear(word):
                 return
         
-        # Basically just ignore "GO" (e.g. "GO NORTH" or "GO INSIDE")
-        if command_words[0] == "GO":
-            if len(command_words) == 1:
-                Print("Where would you like to go?")
-                return
-            del command_words[0]
-
         if len(command_string) == 0:
             Print("Eh?")
             return
@@ -427,6 +421,18 @@ class ActionsMaster:
                     Print("Okay, Restart cancelled.")
                     state.restart_pending = False
                 return
+
+        if player.hp <= 0:
+            Print("You can't do that on account of the fact that you're dead.")
+            player.Kill("")
+            return
+
+        # Basically just ignore "GO" (e.g. "GO NORTH" or "GO INSIDE")
+        if command_words[0] == "GO":
+            if len(command_words) == 1:
+                Print("Where would you like to go?")
+                return
+            del command_words[0]
 
         # Locate prepositions in the command (if any)
         preposition_index = -1
