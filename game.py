@@ -487,6 +487,13 @@ class ActionsMaster:
                 user_action_words.append(command_words[preposition_index])
             state.ClearPending()
             state.this_parsed_command = [Token("Action", action_key, user_action_words)]
+
+            # Handle actions that mimic other actions
+            mimic_action = self[action_key].get("mimic")
+            if mimic_action:
+                if state.debug:
+                    Print("MIMIC action detected")
+                state.this_parsed_command[0].key = mimic_action
             
             if preps_found:
                 # Handle case with one object, e.g. TURN ON FLASHLIGHT
@@ -518,11 +525,6 @@ class ActionsMaster:
             for this_token in state.this_parsed_command:
                 if not this_token:
                     return
-
-            # Handle actions that mimic other actions
-            mimic_action = self[action_key].get("mimic")
-            if mimic_action:
-                state.this_parsed_command[0].key = mimic_action
 
         elif state.waiting_for_item:
             # First word was not an action.
