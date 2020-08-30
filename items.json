@@ -91,6 +91,6 @@
     "init_loc": "PLAYER"
   },
   "ALL": { "name": "All", "words": ["ALL"], "no_article?": true },
-  "NUMBER": { "name": "Number", "words": ["NUMBER"], "user_value": "" },
+  "NUMBER": { "name": "number", "words": ["NUMBER"], "user_value": "" },
   "IT": {"name": "It", "words": ["IT"]}
 }

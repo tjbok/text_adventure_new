@@ -34,8 +34,8 @@
   "DANCE": {"words": ["DANCE"]},
   "INSERT": { "words": ["INSERT"], "requires_object?": true, "suppress_in_actions_list?": true},
   "PUT_INTO": { "words": ["PUT","INSERT"], "requires_object?": true, "prepositions": ["INTO","IN","INSIDE"], "supports_all?": true},
-  "TYPE": { "words": ["TYPE"], "requires_object?": true, "suppress_in_actions_list?": true },
-  "TYPE_ON": { "words": ["TYPE"], "requires_object?": true, "prepositions": ["ON", "INTO"]},
+  "TYPE": { "words": ["TYPE"], "requires_object?": true, "suppress_in_actions_list?": true, "expects_number?": true },
+  "TYPE_ON": { "words": ["TYPE"], "requires_object?": true, "prepositions": ["ON", "INTO"], "expects_number?": true},
   "TURN_ON": { "words": ["TURN", "SWITCH"], "requires_object?": true, "prepositions" : ["ON"], "no_second_item?": true },
   "TURN_OFF": { "words": ["TURN", "SWITCH"], "requires_object?": true, "prepositions" : ["OFF"], "no_second_item?": true },
   "DEBUG" : {"words": ["DEBUG"], "suppress_in_actions_list?": true }

@@ -97,6 +97,9 @@ def Number(context, action, other_item, item_is_secondary):
 
         context.Print("Nothing happens.")
         return True
+    elif not action.get("expects_number?"):
+        context.Print("You can't do that.")
+        return True
     return False
 
 def PlayJukebox(context):
