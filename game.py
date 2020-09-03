@@ -926,7 +926,7 @@ class ItemsMaster:
         if len(put_list) == 0:
             print_str = "You aren't carrying anything"
             if len(player.inventory) >= 1:
-                print_str += " that you can place in the pack"
+                print_str += " that you can place in that"
             Print(print_str + "!")
             return
 
@@ -979,7 +979,7 @@ class ItemsMaster:
             # Attempt to place item in a container
             if not item_placed:
                 for container_key in self.items_dictionary:
-                    if (container_key == location_key) and (self.items_dictionary[container_key].get("is_container?")):
+                    if container_key == location_key:
                         self.items_dictionary[container_key]["contents"].append(item_key)
                         break
 

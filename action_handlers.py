@@ -171,7 +171,7 @@ def Insert(context, item):
     context.Print("You can't insert that.")    
 
 def PutIn(context, item, second_item):
-    if item["key"] == "ALL":
+    if (item["key"] == "ALL") and (not second_item == None) and second_item.get("is_container?"):
         context.items.PutAllIn(second_item)
     elif not item["key"] in context.player.inventory:
         context.PrintItemInString("You're not holding the @.", item)
