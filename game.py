@@ -1142,7 +1142,7 @@ class ItemsMaster:
         for location_key in locations.locations_dictionary:
             contents = locations.locations_dictionary[location_key].get("items")
             if contents and (item_key in contents):
-                self[location_key]["items"].remove(item_key)
+                locations[location_key]["items"].remove(item_key)
 
     # Moves an item from its current location to a new location (location can also be "PLAYER" or a container item key)
     def MoveItemTo(self, item, location_key):
