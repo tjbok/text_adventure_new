@@ -896,13 +896,17 @@ class ItemsMaster:
     def AddItemHandler(self, item_key, handler):
         self[item_key]["handler"] = handler
 
+    def AddItemLookHandler(self, item_key, handler):
+        self[item_key]["look_handler"] = handler
+
     # Serialize items to a dictionary, excluding descriptions and immutable fields
     def Serialize(self):
         serialize_dict = {}
         for item in self.items_dictionary.values():
             item_entry = {}
             for key, value in item.items():
-                if key not in ["name","words","adjectives","init_loc","long_desc","examine_string","handler"]:
+                if key not in ["name","words","adjectives","init_loc","long_desc","examine_string",
+                               "handler","look_handler"]:
                     item_entry[key] = value
             if item_entry:
                 serialize_dict[item["key"]] = item_entry
@@ -959,8 +963,10 @@ class ItemsMaster:
                     if blank_line:
                         print()
                     first_item = False
-                item_string = ' ' * indent + decorate[0] + self.GetLongDescription(item_key, article) + decorate[1]
-                self.AppendItemContentsToDescription(item_string, item_key, indent)
+                handler = self[item_key].get("look_handler")
+                if (not handler) or (not handler(context, indent)):
+                    item_string = ' ' * indent + decorate[0] + self.GetLongDescription(item_key, article) + decorate[1]
+                    self.AppendItemContentsToDescription(item_string, item_key, indent)
 
     # return list of string keys of items in the passed-in list along with any other items contained in these items
     def FindItemsInside(self, items_list):

@@ -11,6 +11,11 @@
 #        was "PUT COIN IN BACKPACK" then the other_item would be the backpack
 #        and item_is_secondary will be true.
 
+# You can also add a look handler which will describe the item when the player does a LOOK in
+#  the item's location, or if it's in inventory. This is useful if you want to describe it
+#  differently the first time you see it, or if it's a special kind of container.
+# Like regular item handlers, you'll can return False if you want the regular logic to run
+
 # NOTES ON ITEMS.JSON
 #    "name" : the item's short name (e.g. "coin")
 #    "long_desc" : [optional] the item's slightly longer description (e.g. "shiny silver coin")
@@ -164,6 +169,13 @@ def Flashlight(context, action, other_item, item_is_secondary):
         return True
     return False
 
+def FlashlightLook(context, indent=0):
+    if not context.items["FLASHLIGHT"].get("touched?"):
+        context.Print(' '*indent + "Your eye is drawn to a flashlight, sitting on a countertop.")
+        context.items["FLASHLIGHT"]["touched?"] = True
+        return True
+    return False
+
 # Here is where you "bind" your item handler function to a specific item.
 def Register(context):
     items = context.items
@@ -173,3 +185,4 @@ def Register(context):
     items.AddItemHandler("PUNCHING_BAG", PunchingBag)
     items.AddItemHandler("NUMBER", Number)
     items.AddItemHandler("FLASHLIGHT", Flashlight)
+    items.AddItemLookHandler("FLASHLIGHT", FlashlightLook)
