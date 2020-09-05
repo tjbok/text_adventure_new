@@ -3,6 +3,8 @@
   "ACTIONS" : { "words": ["ACTIONS", "VERBS", "COMMANDS"] },
   "QUIT" : {"words" : ["QUIT", "Q"]},
   "RESTART" : {"words" : ["RESTART"]},
+  "SAVE" : {"words" : ["SAVE"]},
+  "RESTORE" : {"words" : ["RESTORE"]},
   "YES" : {"words": ["YES","Y"], "suppress_in_actions_list?": true },
   "NO" : {"words": ["NO"], "suppress_in_actions_list?": true },
   "GET": { "words": ["GET", "TAKE"], "requires_object?": true, "supports_all?": true },

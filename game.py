@@ -9,8 +9,11 @@ import globals
 import item_handlers
 import location_handlers
 import textwrap
+import pickle
+from pathlib import Path
 
 ######################### CONTEXT #########################
+
 
 # This class is a package of all of the major object containers which can easily be passed to action handlers
 class Context:
@@ -33,9 +36,134 @@ class Context:
             default_string = "T" + default_string[1:]
         self.Print(default_string)
 
+    # Prompts the user to enter a slot to save their game.
+    # If the boolean argument is set to true, the user's entered slot must already exist
+    def PromptForFilename(self, slot_must_exist = False):
+        # Determine path
+        filepath = Path.cwd() / "save_data"
+        if (not filepath.exists()) or (not filepath.is_dir()):
+            filepath.mkdir(parents=False, exist_ok=True)
+
+        # Display saves
+        slots_str = "Save slots used (* = most recent): "
+        most_recent_time = 0
+        most_recent_slot = None
+        slots_used = []
+        for i in range(20):
+            slot_file = filepath / ("game_data" + ("0" if i < 10 else "") + str(i) + ".pickle")
+            if slot_file.exists():
+                slots_used.append(i)
+                if slot_file.stat().st_mtime > most_recent_time:
+                    most_recent_time = slot_file.stat().st_mtime
+                    most_recent_slot = i
+        for i in slots_used:
+            slots_str += ("*" if most_recent_slot == i else " ") + str(i) + " "
+        Print(slots_str)
+
+        # Prompt for slot number
+        user_slot = input("  Enter save slot (1-20) [blank = cancel] >> ")
+        Print("")
+
+        # Is it valid?
+        if (not user_slot.isdigit()) or (int(user_slot) < 1) or (int(user_slot) > 20):
+            return None
+
+        if slot_must_exist and not int(user_slot) in slots_used:
+            return None
+
+        return filepath / ("game_data" + ("0" if int(user_slot) < 10 else "") + user_slot + ".pickle")
+
+    # Simple encryption so our save files don't include strings that give away game elements
+    def EncryptString(self, text, offset):
+        result = ""
+        for i in range(len(text)):
+            char = text[i]
+            if not char.isalpha():
+                result += char
+            elif char.isupper():
+                result += chr((ord(char) + offset - 65) % 26 + 65)
+            else:
+                result += chr((ord(char) + offset - 97) % 26 + 97)
+        return result
+
+    def DoEncryptObject(self, obj, offset):
+        if isinstance(obj,dict):
+            encrypted = {}
+            for key in obj.keys():
+                encrypted[self.EncryptString(key,offset)] = self.DoEncryptObject(obj[key], offset)
+            return encrypted
+        elif isinstance(obj,list):
+            encrypted = []
+            for entry in obj:
+                encrypted.append(self.DoEncryptObject(entry, offset))
+            return encrypted
+        elif isinstance(obj,str):
+            return self.EncryptString(obj, offset)
+        else:
+            return obj
+
+    def EncryptObject(self, obj):
+        return self.DoEncryptObject(obj,9)
+
+    def DecryptObject(self, obj):
+        return self.DoEncryptObject(obj, -9)
+
+    # This is part one of the restore process: attempt to load a save from file. If successful,
+    #  a restore package is returned.
+    def LoadRestorePackage(self):
+        filepath = self.PromptForFilename(True)
+        if not filepath:
+            Print("Restore cancelled.")
+            return None
+        save_state = {}
+        events_list = []
+        with open(filepath, "rb") as f:
+            save_state = pickle.load(f)
+            events_list = pickle.load(f)
+        if save_state:
+            return [self.DecryptObject(save_state), self.DecryptObject(events_list)]
+        return None
+
+    # Method is called during a restore, when a save has been successfully loaded from disk
+    # All initialization of player, items, locations, etc MUST have already taken place
+    #  before calling ProcessRestore().
+    def ProcessRestorePackage(self, restore_package):
+        if not restore_package:
+            return
+
+        save_state = restore_package[0]
+        events_list = restore_package[1]
+
+        for key in save_state["player"].keys():
+            self.player.__dict__[key] = save_state["player"][key]
+        for key in save_state["state"].keys():
+            self.state.__dict__[key] = save_state["state"][key]
+        for item_key in save_state["items"].keys():
+            for attr_key in save_state["items"][item_key].keys():
+                self.items[item_key][attr_key] = save_state["items"][item_key][attr_key]
+        for loc_key in save_state["locations"].keys():
+            for attr_key in save_state["locations"][loc_key].keys():
+                self.locations[loc_key][attr_key] = save_state["locations"][loc_key][attr_key]
+        self.events.events = events_list
+
+    def SaveGame(self):
+        filepath = self.PromptForFilename(False)
+        if not filepath:
+            Print("Save cancelled.")
+            return
+        save_state = {}
+        save_state["player"] = self.player.Serialize()
+        save_state["locations"] = locations.Serialize()
+        save_state["items"] = items.Serialize()
+        save_state["state"] = self.state.Serialize()
+        with open(filepath, "wb") as f:
+            pickle.dump( self.EncryptObject(save_state), f)
+            pickle.dump(self.EncryptObject(self.events.Serialize()), f)
+        Print("Game saved.")
 
 
 ######################### TOKEN #########################
+
 
 # This class contains token information (for parsed tokens)
 class Token:
@@ -44,7 +172,9 @@ class Token:
         self.key = token_key
         self.user_words = token_user_words
 
+
 ######################### PLAYER #########################
+
 
 # This class contains player status information
 class Player:
@@ -52,7 +182,9 @@ class Player:
         self.hp = 100
         self.inventory = []
         self.location = ""
-        self.quit_requested = False
+
+    def Serialize(self):
+        return self.__dict__
 
     def IsAlive(self):
         return self.hp > 0
@@ -71,15 +203,18 @@ class Player:
         state.restart_pending = True
         self.hp = 0
 
+
 ######################### GLOBAL CONDITIONS #########################
+
 
 # This class is used to track various state variables and history
 class State:
     def __init__(self):
-        self.turn_counter = 0
+        # Start by setting all non-serialized state vars (stuff you don't want saved/restored)
         self.quit_confirmed = False
         self.quit_pending = False
         self.restart_confirmed = False
+        self.restore_requested = False
         self.restart_pending = False
         self.waiting_for_item = False
         self.disambiguate_list = []
@@ -91,6 +226,19 @@ class State:
         self.oops_index = None
         self.oops_words = None
         self.debug = False
+
+        self.nonserialize_attributes = []
+        for key in self.__dict__:
+            self.nonserialize_attributes.append(key)
+
+        self.turn_counter = 0
+
+    def Serialize(self):
+        serialize_dict = {}
+        for key in self.__dict__.keys():
+            if key not in self.nonserialize_attributes:
+                serialize_dict[key] = self.__dict__[key]
+        return serialize_dict
 
     def ClearPending(self):
         self.quit_pending = False
@@ -104,7 +252,7 @@ class State:
 
     # This is called at the end of each turn; it remembers this period's user input and commands for recall next period
     def PostProcess(self):
-        if self.parse_successful:
+        if self.parse_successful and (not state.restart_pending) and (not state.quit_pending) and (not state.restore_requested):
             events.CheckEvents(self.turn_counter)
             self.turn_counter += 1
             self.last_parsed_command = self.this_parsed_command
@@ -114,7 +262,9 @@ class State:
             self.waiting_for_item = False
             self.disambiguate_list = []
 
+
 ######################### LOCATIONS #########################
+
 
 # Master object container for locations
 class LocationsMaster:
@@ -128,9 +278,24 @@ class LocationsMaster:
             self.locations_dictionary[loc_key]["items"] = []
             self.locations_dictionary[loc_key]["enter_handler"] = None
             self.locations_dictionary[loc_key]["when_here_handler"] = None
+            self.locations_dictionary[loc_key]["look_handler"] = None
 
     # This allows you to type "locations[<key>]" for convenience
     def __getitem__(self, key): return self.locations_dictionary[key]
+
+    # Convert locations to dictionary, excluding any descriptions, direction attributes, and immutable stuff
+    def Serialize(self):
+        serialize_dict = {}
+        for location in self.locations_dictionary.values():
+            location_entry = {}
+            for key, value in location.items():
+                if key not in ["brief_desc","long_desc","north","south","east","west","northeast","northwest",
+                               "southeast","southwest","up","down","in","out","enter_handler",
+                               "when_here_handler","look_handler","key"]:
+                    location_entry[key] = value
+            if location_entry:
+                serialize_dict[location["key"]] = location_entry
+        return(serialize_dict)
 
     # Add a function to trigger on entering this location
     def AddEnterHandler(self, loc_key, handler):
@@ -217,7 +382,9 @@ class LocationsMaster:
         
         return True
 
+
 ######################### ACTIONS #########################
+
 
 # Master object container for actions
 class ActionsMaster:
@@ -225,6 +392,8 @@ class ActionsMaster:
     def __init__(self):
         with open('actions.json') as data_file:
             self.actions_dictionary = json.load(data_file)
+        self.swear_words = []
+        self.swear_response = "Hey, watch your language!"
         self.all_prepositions = []
         self.all_actions = []
         for action_key in self.actions_dictionary:
@@ -420,7 +589,7 @@ class ActionsMaster:
         # Handle case where we're waiting to see if the user confirmed a RESTART (by typing Y or N)
         if state.restart_pending and (len(command_words) == 1):
             if (command_string == 'Y') or (command_string == 'YES'):
-                Print("Restarting...\n\n")
+                Print("Restarting...\n")
                 state.restart_confirmed = True
                 return
             if (command_string == 'N') or (command_string == 'NO'):
@@ -681,7 +850,9 @@ class ActionsMaster:
         else:
             Print(default_result)
 
+
 ######################### ITEMS #########################
+
 
 # Master object container for items
 class ItemsMaster:
@@ -724,6 +895,18 @@ class ItemsMaster:
 
     def AddItemHandler(self, item_key, handler):
         self[item_key]["handler"] = handler
+
+    # Serialize items to a dictionary, excluding descriptions and immutable fields
+    def Serialize(self):
+        serialize_dict = {}
+        for item in self.items_dictionary.values():
+            item_entry = {}
+            for key, value in item.items():
+                if key not in ["name","words","adjectives","init_loc","long_desc","examine_string","handler"]:
+                    item_entry[key] = value
+            if item_entry:
+                serialize_dict[item["key"]] = item_entry
+        return(serialize_dict)
 
     # Returns the key of an item, checking first to see if the item is already a key
     # Point of this is to make it easy to create helper functions that take an item
@@ -983,7 +1166,9 @@ class ItemsMaster:
                         self.items_dictionary[container_key]["contents"].append(item_key)
                         break
 
+
 ######################### EVENTS #########################
+
 
 class Event:
     # Constructor
@@ -995,6 +1180,9 @@ class EventsMaster:
     # Constructor
     def __init__(self):
         self.events = []
+
+    def Serialize(self):
+        return self.events
 
     # Each turn, we go through the event queue to see if any are supposed to trigger this turn.
     def CheckEvents(self, turn_counter):
@@ -1017,6 +1205,7 @@ class EventsMaster:
     # This adds a simple event in N moves which prints a string
     def PrintStringInNMoves(self, string, n):
         self.CreateEventInNMoves(lambda x: Print("\n" + string), n)
+
 
 ######################### HELPER FUNCTIONS #########################
 
@@ -1042,27 +1231,50 @@ location_handlers.Register(context)
 
 # Here is the MAIN LOOP
 def Play():
+    global player
+    global locations
+    global actions
+    global items
+    global events
+    global state
+    global context
+    restoring = False
+    restore_package = None
     while not state.quit_confirmed:
-        globals.IntroText(context)
         globals.InitialSetup(context)
+        if restoring:
+            context.ProcessRestorePackage(restore_package)
+            restore_package = None
+            restoring = False
+        else:
+            globals.IntroText(context)
+
         locations.DoLook()
-        while not (state.quit_confirmed or state.restart_confirmed):
+        while not (state.quit_confirmed or state.restart_confirmed or state.restore_requested):
             print()
             actions.ParseCommand(input("> "))
             state.PostProcess()
 
-        # Handle restart
-        if state.restart_confirmed:
-            player.__init__()
-            locations.__init__()
-            actions.__init__()
-            items.__init__()
-            events.__init__()
-            state.__init__()
-            context.__init__(player, locations, actions, items, state, events)
+            if state.restore_requested:
+                restore_package = context.LoadRestorePackage()
+                if restore_package:
+                    restoring = True
+                else:
+                    state.restore_requested = False
+
+        # Handle restart or restore
+        if state.restart_confirmed or restoring:
+            player = Player()
+            locations = LocationsMaster()
+            actions = ActionsMaster()
+            items = ItemsMaster()
+            events = EventsMaster()
+            state = State()
+            context = Context(player, locations, actions, items, state, events)
             action_handlers.Register(context)
             item_handlers.Register(context)
             location_handlers.Register(context)
+
 
 if __name__ == "__main__":
    Play()

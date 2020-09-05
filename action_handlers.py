@@ -150,6 +150,12 @@ def Actions(context):
 
         PrintAction(context, action_key)
 
+def Save(context):
+    context.SaveGame()
+
+def Restore(context):
+    context.state.restore_requested = True
+
 def Quit(context):
     context.state.quit_pending = True
     context.Print("Are you sure you want to quit (Y/N)?")
@@ -216,6 +222,8 @@ def Register(context):
     actions.AddActionHandler("ACTIONS", Actions)
     actions.AddActionHandler("QUIT", Quit)
     actions.AddActionHandler("RESTART", Restart)
+    actions.AddActionHandler("SAVE", Save)
+    actions.AddActionHandler("RESTORE", Restore)
     actions.AddActionHandler("YES", Yes)
     actions.AddActionHandler("NO", No)
     actions.AddActionHandler("WAIT", Wait)
